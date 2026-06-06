@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block header_content %}
+<section class="wc-bestxi-page">
+    <div class="wc-bestxi-heading animate__animated animate__fadeInDown">
+        <h1>Best XI</h1>
+        <p>Highest-rated lineup right now · 3-4-3 · Refresh to recompute</p>
+    </div>
+
+    <div class="wc-pitch-wrap">
+        <div class="wc-pitch" id="wc_pitch">
+            <!-- Pitch markings (defending half only: halfway line at top,
+                 GK's penalty area at the bottom). viewBox is 100 wide x 70
+                 tall = half of a full pitch. -->
+            <svg class="wc-pitch-lines" viewBox="0 0 100 70" preserveAspectRatio="none" aria-hidden="true">
+                <!-- Touchlines / halfway line -->
+                <rect x="2" y="0" width="96" height="68" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.4"/>
+                <line x1="2" y1="0" x2="98" y2="0" stroke="rgba(255,255,255,0.45)" stroke-width="0.5"/>
+                <!-- Centre circle (bottom half is visible) -->
+                <path d="M 41,0 A 9,9 0 0 0 59,0" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.4"/>
+                <circle cx="50" cy="0" r="0.7" fill="rgba(255,255,255,0.55)"/>
+                <!-- Penalty area + 6-yard box at the bottom of the half -->
+                <rect x="25" y="52" width="50" height="16" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.4"/>
+                <rect x="37" y="62" width="26" height="6" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.4"/>
+                <!-- Penalty spot + arc -->
+                <circle cx="50" cy="57" r="0.6" fill="rgba(255,255,255,0.5)"/>
+                <path d="M 44,52 A 7,7 0 0 1 56,52" fill="none" stroke="rgba(255,255,255,0.35)" stroke-width="0.4"/>
+            </svg>
+
+            <!-- Player slots get injected by JS into these wrappers -->
+            <div class="wc-row wc-row-fwd"  data-bucket="FWD" data-count="3"></div>
+            <div class="wc-row wc-row-mid"  data-bucket="MID" data-count="4"></div>
+            <div class="wc-row wc-row-def"  data-bucket="DEF" data-count="3"></div>
+            <div class="wc-row wc-row-gk"   data-bucket="GK"  data-count="1"></div>
+        </div>
+    </div>
+
+    <div class="wc-subs">
+        <h2>Substitutes</h2>
+        <div class="wc-subs-row" id="wc_subs_row"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/bestxi.js') }}"></script>
+{% endblock %}

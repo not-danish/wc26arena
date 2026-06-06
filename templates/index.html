@@ -1,28 +1,33 @@
 {% extends "base.html" %}
 
 {% block header_content %}
+<section class="wc-hero">
+    <video autoplay muted loop playsinline class="wc-hero-bg-video">
+        <source src="https://www.dropbox.com/scl/fi/n29t54jyexki2zfsh1uj1/header-vid.mp4?rlkey=8ntaqh6ikoo79izh8jyennynn&raw=1" type="video/mp4">
+    </video>
 
-    <!-- Background video section -->
-    <video autoplay muted loop class="absolute inset-0 object-cover w-full h-full opacity-20">
-            <source src="https://www.dropbox.com/scl/fi/n29t54jyexki2zfsh1uj1/header-vid.mp4?rlkey=8ntaqh6ikoo79izh8jyennynn&raw=1" type="video/mp4">
-                <!-- Add additional source elements for other video formats if needed -->
-                Your browser does not support the video tag.
-            </video>
-            
-            <div class="w-screen h-screen relative sm:text-center sm:justify-center">
-                <div class="text-white text-left h-screen w-full flex flex-col items-start justify-center pl-8">
-                    <h1 class="md:text-4xl lg:text-7xl 2xl:text-8xl animate__animated animate__fadeInLeft animate__slower bg-blue-000 p-3 rounded-">DISCOVER THE TOP FOOTBALL PLAYERS <br>WORLDWIDE</h1>
-                    <p class="font-thin text-3xl mt-5 mb-10 ml-2 animate__animated animate__fadeInLeft animate__slower animate__delay-1s">As Ranked by You </p>
-                    <a href="javascript:void(0)" class="border-dark dark:border-dark-2 border rounded-md inline-flex items-center justify-center py-3 px-7 text-center text-base font-medium text-dark dark:text-white hover:bg-gray-4 dark:hover:bg-dark-3 disabled:bg-gray-3 disabled:border-gray-3 disabled:text-dark-5 animate__animated animate__fadeInUp animate__slower animate__delay-2s hover:bg-blue-700">
-                        Rank Players
-                        </a>        
-                    
-                </div>
-            </div>
+    <div class="wc-hero-inner">
+        <span class="wc-eyebrow animate__animated animate__fadeInDown">wc26arena.com · The People's Hall of Fame</span>
 
+        <h1 class="animate__animated animate__fadeInLeft animate__slower">
+            WHO IS THE <br>
+            <span class="accent">GREATEST</span><br>
+            OF 26?
+        </h1>
 
+        <p class="animate__animated animate__fadeInLeft animate__slower animate__delay-1s">
+            1,243 players. 48 nations. One tournament. Cast your verdict and decide who deserves a place on the leaderboard.
+        </p>
+
+        <div class="wc-nations animate__animated animate__fadeIn animate__delay-1s">
+            <span class="can"></span>
+            <span class="mex"></span>
+            <span class="usa"></span>
+        </div>
+
+        <a href="/rank" class="wc-btn animate__animated animate__fadeInUp animate__slower animate__delay-2s">
+            Start Ranking →
+        </a>
+    </div>
+</section>
 {% endblock %}
-
-
-
-

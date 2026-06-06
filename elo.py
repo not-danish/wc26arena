@@ -43,10 +43,9 @@ def get_tier_from_elo(player_elo: int):
 def calculate_elo(winning_elo, losing_elo):
     winning_expected_score  = 1/(1+(10**((losing_elo-winning_elo)/400)))
 
-    k = 0
     if winning_elo < 2100:
         k = 32
-    elif 2100 < winning_elo < 2400:
+    elif winning_elo < 2400:
         k = 24
     else:
         k = 16

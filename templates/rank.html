@@ -1,13 +1,26 @@
 {% extends "base.html" %}
 
-
 {% block header_content %}
+<section class="wc-rank-page">
+    <div class="wc-rank-heading animate__animated animate__fadeInDown">
+        <h1>Pick Your Player</h1>
+        <p>Tap the footballer you rate higher · Their ELO will rise</p>
+    </div>
+
+    <div id="wc_filter_banner" class="wc-filter-banner hidden">
+        <div>
+            <div class="label">Ranking from</div>
+            <div class="matchup" id="wc_filter_matchup">—</div>
+        </div>
+        <a href="/rank">Clear filter ✕</a>
+    </div>
+
+    <div id="loading_message" class="wc-loading">Loading matchup…</div>
+
     {% include "components/player_card.html" %}
+</section>
 {% endblock %}
 
-
 {% block scripts %}
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script type="module" src="{{url_for('static', filename='scripts/updateFirebase.js')}}"></script>
-    <script type="module" src="{{url_for('static', filename='scripts/playerData.js')}}"></script>
+    <script type="module" src="{{ url_for('static', filename='scripts/updateFirebase.js') }}"></script>
 {% endblock %}

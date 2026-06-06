@@ -1,7 +1,17 @@
 {% extends "base.html" %}
 
 {% block header_content %}
-<section class="snap-section h-screen relative bg-royal-blue">
-    {% include "components/leaderboard_table.html" %}
+<section class="wc-leaderboard-page">
+    <div class="wc-leaderboard-wrap">
+        <div class="wc-leaderboard-heading animate__animated animate__fadeInDown">
+            <h1>The Hall of Fame</h1>
+            <p>Top 100 footballers · Live ELO</p>
+        </div>
+        {% include "components/leaderboard_table.html" %}
+    </div>
 </section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/leaderboard.js') }}"></script>
 {% endblock %}

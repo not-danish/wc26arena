@@ -1,29 +1,35 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home</title>
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static',filename='css/main.css') }}">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Overpass:ital,wght@0,100..900;1,100..900&display=swap">
+    <title>{% block title %}wc26arena.com — Rank every World Cup 26 player{% endblock %}</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/favicon.svg') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/favicon.svg') }}">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/brand.css') }}">
 </head>
 
-<body class="font-overpass font-bold">
-    <header class="bg-royal-blue relative">
-        <!-- Navigation bar -->
-        {% include "components/nav.html" %}
-        <div class="h-screen relative bg-royal-blue">
-            {% block header_content %}
-            {% endblock %}   
-        </div>     
-    </header>
+<body class="wc-pattern">
+    {% include "components/nav.html" %}
+    {% include "components/ticker.html" %}
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
-    {% block scripts %} {% endblock %}
+    <main>
+        {% block header_content %}{% endblock %}
+    </main>
 
+    <div class="wc-footer-strip">
+        <span class="can"></span>
+        <span class="mex"></span>
+        <span class="usa"></span>
+    </div>
+
+    <script src="{{ url_for('static', filename='scripts/ticker.js') }}"></script>
+    {% block scripts %}{% endblock %}
 </body>
-
 </html>

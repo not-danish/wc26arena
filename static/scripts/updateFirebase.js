@@ -1,162 +1,192 @@
-import { displayCharts, setupDropdownListeners } from "./playerData.js";
-
 async function getCachedPlayers() {
     try {
         const response = await fetch('/api/cached_players');
-        const data = await response.json();
-        return data;
+        return await response.json();
     } catch (error) {
         console.error('Error fetching cache: ', error);
         return [];
     }
 }
 
-async function getDetailedPlayer(api_id) {
+async function getFixturePlayers(matchId) {
     try {
-        const response = await fetch(`/api/detailed_data?player_api_id=${api_id}`);
-        const data = await response.json();
-        return data;
+        const response = await fetch(`/api/fixture_players?id=${encodeURIComponent(matchId)}`);
+        if (!response.ok) return null;
+        return await response.json();
+    } catch (error) {
+        console.error('Error fetching fixture players: ', error);
+        return null;
+    }
+}
+
+function currentMatchId() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get('match');
+}
+
+function showFilterBanner(fixture) {
+    const banner = document.getElementById('wc_filter_banner');
+    const matchup = document.getElementById('wc_filter_matchup');
+    if (!banner || !matchup) return;
+    matchup.textContent = `${fixture.home} vs ${fixture.away}`;
+    banner.classList.remove('hidden');
+}
+
+async function getDetailedPlayer(playerId) {
+    try {
+        const response = await fetch(`/api/detailed_data?player_id=${encodeURIComponent(playerId)}`);
+        return await response.json();
     } catch (error) {
         console.error('Error fetching detailed data: ', error);
         return {};
     }
 }
 
-async function displayPlayers() { 
-    const cachedPlayers = await getCachedPlayers();
-    if (cachedPlayers && cachedPlayers.length > 1) {
-        const firstIndex = Math.floor(Math.random() * cachedPlayers.length);
-        
-        let secondIndex;
-        do {
-            secondIndex = Math.floor(Math.random() * cachedPlayers.length);
-        } while (secondIndex === firstIndex);
+function pickTwoDistinct(arr) {
+    const first = Math.floor(Math.random() * arr.length);
+    let second;
+    do { second = Math.floor(Math.random() * arr.length); } while (second === first);
+    return [arr[first], arr[second]];
+}
 
-        const playerData = [cachedPlayers[firstIndex], cachedPlayers[secondIndex]];
-        const seasonDataForBothPlayers = [];
+const SILHOUETTE = 'https://cdn.sofifa.net/player_0.svg';
 
-        for (let i = 0; i < 2; i++) {
-            const ithPlayer = playerData[i];
-            const playerApiId = ithPlayer[1]?.player_api_id;
-            const playerImgSrc = `https://images.fotmob.com/image_resources/playerimages/${playerApiId}.png`;
+// Host-nation accents from the official FIFA 26 brand: Canada red, Mexico
+// green, USA blue. Players from elsewhere get the gold default.
+const HOST_ACCENTS = {
+    'Canada':        '#E31B23',
+    'Mexico':        '#006847',
+    'United States': '#002868',
+};
+const DEFAULT_ACCENT = '#C9A227';
 
-            // Logic to display player rank
-            let rank;
-            const elo = ithPlayer[1]?.ELO;
+function accentForCountry(country) {
+    return HOST_ACCENTS[country] || DEFAULT_ACCENT;
+}
 
-            if (elo !== undefined) {
-                if (elo < 300) rank = '🥉';
-                else if (elo < 600) rank = '🥈';
-                else if (elo < 900) rank = '🥈🥈';
-                else if (elo < 1200) rank = '🥈🥈🥈';
-                else if (elo < 1500) rank = '🥇';
-                else if (elo < 1800) rank = '🥇🥇';
-                else if (elo < 2100) rank = '🌟';
-                else if (elo < 2400) rank = '💎';
-                else if (elo < 2700) rank = '🔴💎';
-                else if (elo < 3000) rank = '⚫💎';
-                else rank = '🔮';
-            } else {
-                rank = 'N/A';
+async function waitForCache(maxAttempts = 6) {
+    for (let i = 0; i < maxAttempts; i++) {
+        const cached = await getCachedPlayers();
+        if (cached && cached.length >= 2) return cached;
+        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+    }
+    return null;
+}
+
+function showGrid() {
+    const grid = document.getElementById('player_grid');
+    const loading = document.getElementById('loading_message');
+    if (grid) grid.classList.remove('hidden');
+    if (loading) loading.classList.add('hidden');
+}
+
+function showLoading(message) {
+    const grid = document.getElementById('player_grid');
+    const loading = document.getElementById('loading_message');
+    if (grid) grid.classList.add('hidden');
+    if (loading) { loading.classList.remove('hidden'); loading.textContent = message; }
+}
+
+let transitioning = false;
+
+function resetCard(slot) {
+    const old = document.getElementById(`player_${slot}_card`);
+    const fresh = old.cloneNode(true);
+    fresh.classList.remove('animate__fadeOut', 'animate__fast');
+    fresh.classList.add('animate__fadeIn', 'animate__slower');
+    old.parentNode.replaceChild(fresh, old);
+    return fresh;
+}
+
+// When a match filter is active we cache the roster for the page lifetime
+// so we're not refetching ~52 players on every vote.
+let fixtureRoster = null;
+let fixtureFetched = false;
+
+async function getRoster() {
+    const matchId = currentMatchId();
+    if (matchId) {
+        if (!fixtureFetched) {
+            fixtureFetched = true;
+            const data = await getFixturePlayers(matchId);
+            if (data && data.players && data.players.length >= 2) {
+                fixtureRoster = data.players;
+                showFilterBanner(data.fixture);
             }
-
-            // Getting respective DOM Elements
-            const playerImageElement = document.getElementById(`player_${i + 1}_image`);
-            const playerNameElement = document.getElementById(`player_${i + 1}_name`);
-            const playerCardElement = document.getElementById(`player_${i + 1}_card`);
-            const otherPlayerCardElement = document.getElementById(`player_${(i === 0 ? 2 : 1)}_card`);
-
-            const playerPositionElement = document.getElementById(`player_${i + 1}_position`);
-            const playerTeamElement = document.getElementById(`player_${i + 1}_club`);
-
-            const test = document.getElementById('test');
-
-            // Getting Detailed Data and using it
-            const detailedData = await getDetailedPlayer(playerApiId);
-            const teamColour = detailedData?.primaryTeam?.teamColors?.color || 'lightgrey';
-            const awayColour = detailedData?.primaryTeam?.teamColors?.colorAway || 'black';
-
-            // Updating values for each DOM Element
-            playerImageElement.onerror = function () {
-                this.src = 'https://cdn.sofifa.net/player_0.svg'; // Set default image URL
-            };
-            playerImageElement.src = playerImgSrc;
-
-
-
-            playerNameElement.innerHTML = `${ithPlayer[1]?.player_name || 'Player'} ${rank}`;   
-            playerNameElement.style.color = 'white';
-            playerCardElement.style.backgroundColor = teamColour;
-
-            playerTeamElement.innerHTML = detailedData?.primaryTeam?.teamName || 'N/A';
-            playerPositionElement.innerHTML = detailedData?.positionDescription?.primaryPosition?.label || 'N/A';
-
-            // Add click event listener to player card for POST request
-            playerCardElement.addEventListener('click', () => {
-                const losingPlayer = ithPlayer === playerData[0] ? playerData[1] : playerData[0];
-                const dataToSend = {
-                    winning_id: ithPlayer[0],
-                    winning_elo: ithPlayer[1].ELO,
-                    losing_id: losingPlayer[0],
-                    losing_elo: losingPlayer[1].ELO
-                };
-                sendCacheUpdate(dataToSend);  // Call function to send POST request
-
-                // Adding fade-out effect 
-                playerCardElement.classList.replace('animate__slower', 'animate__fast');
-                otherPlayerCardElement.classList.replace('animate__slower', 'animate__fast');
-
-                playerCardElement.classList.add('animate__fadeOut');
-                otherPlayerCardElement.classList.add('animate__fadeOut');
-
-                test.classList.toggle('opacity-100');
-
-                
-
-            });
-
-            // onHover event listeners
-            playerCardElement.addEventListener('mouseover', () => {
-                playerCardElement.style.backgroundColor = awayColour;
-                playerCardElement.style.color = teamColour;
-            });
-
-            playerCardElement.addEventListener('mouseout', () => {
-                playerCardElement.style.backgroundColor = teamColour;
-                playerCardElement.style.filter = "none";
-            });
-
-            // Collect the player's season data for chart display
-            seasonDataForBothPlayers.push(detailedData.careerHistory?.careerItems?.senior?.seasonEntries || []);
         }
-
-        // After processing both players, display the charts with the same y-axis max value
-        const params = ['appearances', 'appearances'];
-        displayCharts(seasonDataForBothPlayers[0], seasonDataForBothPlayers[1], params);
-
-        // Call setupDropdownListeners here after rendering the players and charts
-        setupDropdownListeners(seasonDataForBothPlayers[0], seasonDataForBothPlayers[1], params);
-
-        return [cachedPlayers[firstIndex], cachedPlayers[secondIndex]];
+        if (fixtureRoster) return fixtureRoster;
     }
+    return await waitForCache();
 }
 
+async function renderPair() {
+    showLoading('Loading matchup…');
+    const roster = await getRoster();
+    if (!roster || roster.length < 2) {
+        showLoading('No players available. Refresh in a moment.');
+        return;
+    }
+    showGrid();
+    transitioning = false;
 
-// Function to send POST request to /api/cache_updates
-async function sendCacheUpdate(dataToSend) {
-    try {
-        const response = await fetch('/api/update_data', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(dataToSend)
+    const pair = pickTwoDistinct(roster);
+    const cards = [resetCard(1), resetCard(2)];
+
+    for (let i = 0; i < 2; i++) {
+        const [pid, prec] = pair[i];
+        const slot = i + 1;
+        const cardEl = cards[i];
+        const imgEl = cardEl.querySelector(`#player_${slot}_image`);
+        const nameEl = cardEl.querySelector(`#player_${slot}_name`);
+        const positionEl = cardEl.querySelector(`#player_${slot}_position`);
+        const clubEl = cardEl.querySelector(`#player_${slot}_club`);
+
+        imgEl.onerror = function () { this.src = SILHOUETTE; };
+        imgEl.src = prec.image_url || SILHOUETTE;
+
+        nameEl.textContent = prec.player_name || 'Player';
+
+        const accent = accentForCountry(prec.country);
+        cardEl.style.setProperty('--wc-card-accent', accent);
+
+        const detail = await getDetailedPlayer(pid);
+        const club = detail.club || prec.club || 'N/A';
+        const country = detail.country || prec.country || '';
+        clubEl.textContent = country ? `${club} · ${country}` : club;
+        positionEl.textContent = detail.position || prec.position || 'N/A';
+
+        cardEl.addEventListener('click', () => {
+            if (transitioning) return;
+            transitioning = true;
+
+            const winner = pair[i];
+            const loser = pair[i === 0 ? 1 : 0];
+            sendVote({
+                winning_id: winner[0],
+                winning_elo: winner[1].ELO,
+                losing_id: loser[0],
+                losing_elo: loser[1].ELO,
+            });
+
+            for (const el of cards) {
+                el.classList.replace('animate__slower', 'animate__fast');
+                el.classList.add('animate__fadeOut');
+            }
+            setTimeout(renderPair, 600);
         });
-
-        const result = await response.json();
-    } catch (error) {
-        console.error('Error sending cache update:', error);
     }
 }
 
-displayPlayers();
+async function sendVote(payload) {
+    try {
+        await fetch('/api/update_data', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+    } catch (error) {
+        console.error('Error sending vote:', error);
+    }
+}
+
+renderPair();

@@ -4,3 +4,6 @@ football-rank-aaa71-firebase-adminsdk-mqfwe-9837c1d800.json
 .DS_Store
 /node_modules
 __pycache__/elo.cpython-311.pyc
+firebase_backup_*.json
+squads.json
+resolved.json
