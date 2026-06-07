@@ -284,13 +284,30 @@ def diag_api():
         "fb_key_path_set": bool(os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')),
         "fb_json_set": bool(os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')),
     }
+    # 1) Try to read a single player record using a valid query.
     try:
-        sample = db.reference('data/players').limit_to_first(1).get()
+        sample = db.reference('data/players').order_by_key().limit_to_first(1).get()
         info["live_read_ok"] = True
-        info["live_read_sample_keys"] = list(sample.keys()) if isinstance(sample, dict) else type(sample).__name__
+        info["live_read_returned"] = (
+            list(sample.keys()) if isinstance(sample, dict)
+            else (f"list-of-{len(sample)}" if isinstance(sample, list) else type(sample).__name__)
+        )
     except Exception as e:
         info["live_read_ok"] = False
         info["live_read_error"] = f"{type(e).__name__}: {e}"
+
+    # 2) Force a cache refresh inline and report the result.
+    try:
+        _refresh_player_cache()
+        info["forced_refresh_ok"] = True
+        info["forced_refresh_size"] = player_cache.get('pool_total', 0)
+    except Exception as e:
+        info["forced_refresh_ok"] = False
+        info["forced_refresh_error"] = f"{type(e).__name__}: {e}"
+
+    # 3) Confirm whether the background cache thread is actually alive.
+    import threading as _t
+    info["thread_names"] = [t.name for t in _t.enumerate() if t.daemon]
     return jsonify(info)
 
 
