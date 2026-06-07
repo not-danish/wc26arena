@@ -211,7 +211,7 @@
                 return;
             }
             root.innerHTML = render(data);
-            document.title = `${data.player.player_name} — wc26arena`;
+            document.title = `${data.player.player_name} · wc26arena`;
             const wrap = root.querySelector('.wc-chart-wrap');
             if (wrap) initChart(wrap);
         } catch (e) {
