@@ -1,0 +1,25 @@
+# Render service definition for wc26arena.com.
+# See https://render.com/docs/blueprint-spec for the full schema.
+#
+# After committing this file, on Render: New → Blueprint → connect this repo.
+# Render reads this file and creates the service. From then on, every push to
+# the default branch redeploys automatically.
+services:
+  - type: web
+    name: wc26arena
+    runtime: python
+    plan: free
+    region: oregon
+    branch: master
+    buildCommand: pip install -r requirements.txt
+    # One gunicorn worker because the in-process cache thread + Firebase admin
+    # SDK don't share well across workers. The free plan only has 0.5 CPU
+    # anyway. If we ever upgrade, bump --workers and move the cache to Redis.
+    startCommand: gunicorn -w 1 -k gthread --threads 8 -b 0.0.0.0:$PORT app:app
+    envVars:
+      - key: DATABASE_URL
+        sync: false                       # set in dashboard, not in YAML
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY
+        value: /etc/secrets/firebase.json # mounted from a secret file
+      - key: PYTHON_VERSION
+        value: "3.11"

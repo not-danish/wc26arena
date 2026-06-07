@@ -9,9 +9,7 @@ import time
 import threading
 from datetime import datetime, timezone
 
-load_dotenv()  # Load environment variables from .env file
-
-firebase_key_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+load_dotenv()  # Load environment variables from .env file (no-op in production)
 
 app = Flask(__name__)
 
@@ -22,9 +20,24 @@ app = Flask(__name__)
 -------------------------------------
 '''
 
-# Initialize Firebase Admin SDK
-cred = credentials.Certificate(firebase_key_path)
-initialize_app(cred, {'databaseURL': os.getenv('DATABASE_URL')})
+# Two ways to provide the service account credentials:
+#   1. FIREBASE_SERVICE_ACCOUNT_KEY = path to a JSON file (local dev,
+#      Render secret files)
+#   2. FIREBASE_SERVICE_ACCOUNT_JSON = the entire JSON blob as a string
+#      (handy when the host only exposes env vars, not file mounts)
+def _build_firebase_credentials():
+    key_path = os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')
+    if key_path and os.path.isfile(key_path):
+        return credentials.Certificate(key_path)
+    blob = os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')
+    if blob:
+        return credentials.Certificate(json.loads(blob))
+    raise RuntimeError(
+        "No Firebase credentials. Set FIREBASE_SERVICE_ACCOUNT_KEY (path) "
+        "or FIREBASE_SERVICE_ACCOUNT_JSON (raw JSON)."
+    )
+
+initialize_app(_build_firebase_credentials(), {'databaseURL': os.getenv('DATABASE_URL')})
 
 # Get a reference to the Firebase Realtime Database
 firebase_db = db.reference()
