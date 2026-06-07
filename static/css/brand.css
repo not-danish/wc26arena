@@ -1051,6 +1051,63 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-spark { width: 100%; height: 120px; }
 
+/* Interactive ELO-history chart on player profile pages. */
+.wc-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  user-select: none;
+  cursor: crosshair;
+}
+.wc-chart {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.wc-chart-tip {
+  position: absolute;
+  top: -8px;
+  transform: translate(-50%, -100%);
+  background: var(--wc-black);
+  border: 1px solid var(--wc-gold);
+  padding: 0.4rem 0.7rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  color: var(--wc-white);
+  white-space: nowrap;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+.wc-chart-tip .elo {
+  color: var(--wc-gold-bright);
+  font-size: 1rem;
+}
+.wc-chart-tip .ts {
+  color: var(--wc-text-muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.1em;
+}
+.wc-chart-tip .up   { color: #4ade80; margin-left: 0.4rem; }
+.wc-chart-tip .down { color: #f87171; margin-left: 0.4rem; }
+.wc-chart-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--wc-text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.15em;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 1rem;
+}
+
 /* ============ Compare page ============ */
 .wc-compare-page {
   min-height: 100vh;
