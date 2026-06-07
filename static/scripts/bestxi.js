@@ -109,4 +109,37 @@ async function loadBestXi() {
 }
 
 loadBestXi();
+
+document.getElementById('wc_share_png')?.addEventListener('click', async () => {
+    if (!window.html2canvas) return;
+    const target = document.querySelector('.wc-bestxi-page');
+    if (!target) return;
+    const btn = document.getElementById('wc_share_png');
+    const origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Rendering…';
+    try {
+        // CORS-tainted images (TheSportsDB CDN) cause html2canvas to throw
+        // unless useCORS is set; even then some images may fail to render.
+        const canvas = await html2canvas(target, {
+            backgroundColor: '#0A0A0A',
+            useCORS: true,
+            scale: 2,
+            logging: false,
+        });
+        const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'wc26arena-best-xi.png';
+        a.click();
+        URL.revokeObjectURL(url);
+    } catch (e) {
+        console.error(e);
+        alert('Could not generate image. Try a different browser.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
+});
 })();

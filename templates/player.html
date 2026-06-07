@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block header_content %}
+<section class="wc-profile-page" data-player-id="{{ player_id }}">
+    <div id="wc_profile_root">
+        <div class="wc-loading">Loading profile…</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/player.js') }}"></script>
+{% endblock %}

@@ -1,24 +1,3 @@
-async function getCachedPlayers() {
-    try {
-        const response = await fetch('/api/cached_players');
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching cache: ', error);
-        return [];
-    }
-}
-
-async function getFixturePlayers(matchId) {
-    try {
-        const response = await fetch(`/api/fixture_players?id=${encodeURIComponent(matchId)}`);
-        if (!response.ok) return null;
-        return await response.json();
-    } catch (error) {
-        console.error('Error fetching fixture players: ', error);
-        return null;
-    }
-}
-
 function currentMatchId() {
     const params = new URLSearchParams(window.location.search);
     return params.get('match');
@@ -42,13 +21,6 @@ async function getDetailedPlayer(playerId) {
     }
 }
 
-function pickTwoDistinct(arr) {
-    const first = Math.floor(Math.random() * arr.length);
-    let second;
-    do { second = Math.floor(Math.random() * arr.length); } while (second === first);
-    return [arr[first], arr[second]];
-}
-
 const SILHOUETTE = 'https://cdn.sofifa.net/player_0.svg';
 
 // Host-nation accents from the official FIFA 26 brand: Canada red, Mexico
@@ -62,15 +34,6 @@ const DEFAULT_ACCENT = '#C9A227';
 
 function accentForCountry(country) {
     return HOST_ACCENTS[country] || DEFAULT_ACCENT;
-}
-
-async function waitForCache(maxAttempts = 6) {
-    for (let i = 0; i < maxAttempts; i++) {
-        const cached = await getCachedPlayers();
-        if (cached && cached.length >= 2) return cached;
-        await new Promise(r => setTimeout(r, 1000 * (i + 1)));
-    }
-    return null;
 }
 
 function showGrid() {
@@ -98,39 +61,55 @@ function resetCard(slot) {
     return fresh;
 }
 
-// When a match filter is active we cache the roster for the page lifetime
-// so we're not refetching ~52 players on every vote.
-let fixtureRoster = null;
-let fixtureFetched = false;
-
-async function getRoster() {
+async function getNextPair() {
+    // Server-side smart matchmaker: weighted toward similar-ELO opponents
+    // and under-voted players. Falls back to a wait+retry if the cache is
+    // still being primed on cold start.
     const matchId = currentMatchId();
-    if (matchId) {
-        if (!fixtureFetched) {
-            fixtureFetched = true;
-            const data = await getFixturePlayers(matchId);
-            if (data && data.players && data.players.length >= 2) {
-                fixtureRoster = data.players;
-                showFilterBanner(data.fixture);
+    const url = matchId
+        ? `/api/next_pair?match=${encodeURIComponent(matchId)}`
+        : '/api/next_pair';
+
+    for (let attempt = 0; attempt < 6; attempt++) {
+        try {
+            const resp = await fetch(url);
+            if (resp.ok) {
+                const data = await resp.json();
+                if (data.fixture) showFilterBanner(data.fixture);
+                if (data.a && data.b) return [data.a, data.b];
             }
-        }
-        if (fixtureRoster) return fixtureRoster;
+        } catch (e) { /* fall through to retry */ }
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
     }
-    return await waitForCache();
+    return null;
+}
+
+async function getPairSummary(ids) {
+    try {
+        const resp = await fetch(`/api/player_summary?ids=${encodeURIComponent(ids.join(','))}`);
+        return await resp.json();
+    } catch { return {}; }
+}
+
+function trendClass(delta) {
+    if (delta > 0) return 'up';
+    if (delta < 0) return 'down';
+    return 'flat';
 }
 
 async function renderPair() {
     showLoading('Loading matchup…');
-    const roster = await getRoster();
-    if (!roster || roster.length < 2) {
+    const pair = await getNextPair();
+    if (!pair) {
         showLoading('No players available. Refresh in a moment.');
         return;
     }
     showGrid();
     transitioning = false;
 
-    const pair = pickTwoDistinct(roster);
     const cards = [resetCard(1), resetCard(2)];
+
+    const summary = await getPairSummary([pair[0][0], pair[1][0]]);
 
     for (let i = 0; i < 2; i++) {
         const [pid, prec] = pair[i];
@@ -154,6 +133,20 @@ async function renderPair() {
         const country = detail.country || prec.country || '';
         clubEl.textContent = country ? `${club} · ${country}` : club;
         positionEl.textContent = detail.position || prec.position || 'N/A';
+
+        // "Why this one?" hover tooltip: show ELO + 1h trend + W/L so the
+        // user knows what's at stake before clicking.
+        const s = summary[pid] || {};
+        const trend = s.trend_1h || 0;
+        const trendStr = trend > 0 ? `▲ +${trend}` : trend < 0 ? `▼ ${trend}` : '— flat';
+        const tip = document.createElement('div');
+        tip.className = 'wc-compare-tooltip';
+        tip.innerHTML = `
+            ELO ${Math.round(s.ELO ?? prec.ELO)}
+            · W ${s.wins ?? 0}/L ${s.losses ?? 0}
+            · <span class="trend ${trendClass(trend)}">${trendStr} 1h</span>
+        `;
+        cardEl.appendChild(tip);
 
         cardEl.addEventListener('click', () => {
             if (transitioning) return;
@@ -179,11 +172,12 @@ async function renderPair() {
 
 async function sendVote(payload) {
     try {
-        await fetch('/api/update_data', {
+        const resp = await fetch('/api/update_data', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
+        if (resp.ok && window.WCStreak) window.WCStreak.record();
     } catch (error) {
         console.error('Error sending vote:', error);
     }

@@ -39,9 +39,14 @@
         <h2>Substitutes</h2>
         <div class="wc-subs-row" id="wc_subs_row"></div>
     </div>
+
+    <div class="wc-share-row">
+        <button id="wc_share_png" type="button">Download PNG</button>
+    </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="{{ url_for('static', filename='scripts/bestxi.js') }}"></script>
 {% endblock %}

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+
+{% block header_content %}
+<section class="wc-compare-page">
+    <div class="wc-bestxi-heading animate__animated animate__fadeInDown">
+        <h1>Head to Head</h1>
+        <p>Pick any two players · See who's ahead</p>
+    </div>
+
+    <div class="wc-compare-grid">
+        <div class="wc-compare-slot" data-slot="a"></div>
+        <div class="wc-vs-mid vs-divider">VS</div>
+        <div class="wc-compare-slot" data-slot="b"></div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/compare.js') }}"></script>
+{% endblock %}

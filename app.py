@@ -78,28 +78,108 @@ def fetch_players_by_elo(min_elo, max_elo, **kwargs):
 ------------------------------------
 '''
 
-# Server-side read cache. Votes go straight to Firebase via transactions,
-# so this is purely a read accelerator for the rank page rotation.
-player_cache = {'data': {}, 'time': None}
+# Server-side read cache. Holds every player joined with their vote-count
+# stats so the matchmaker can pick informative pairs without re-querying.
+# Votes still go straight to Firebase via transactions, so we don't need
+# to write back at the end of the cache cycle.
+player_cache = {
+    'data': [],          # list of (pid, record_with_vote_count) sorted by ELO
+    'pool_total': 0,     # cached size, for sanity-checking
+    'time': None,
+}
 cache_expiry_time = 300
+import math  # noqa: E402  (kept here next to where it's used)
+
+
+def _refresh_player_cache():
+    """Pull every player + their win/loss counts in one pass."""
+    raw = db.reference('data/players').get() or {}
+    if isinstance(raw, list):
+        raw = {str(i): v for i, v in enumerate(raw) if v}
+    stats = db.reference('data/stats').get() or {}
+    if isinstance(stats, list):
+        stats = {str(i): v for i, v in enumerate(stats) if v}
+
+    enriched = []
+    for pid, p in raw.items():
+        s = stats.get(pid) or {}
+        votes = (s.get('wins') or 0) + (s.get('losses') or 0)
+        enriched.append((pid, {**p, '_votes': votes}))
+    enriched.sort(key=lambda kv: kv[1].get('ELO', 0), reverse=True)
+
+    player_cache['data'] = enriched
+    player_cache['pool_total'] = len(enriched)
+    player_cache['time'] = time.time()
 
 
 def update_cache():
     while True:
-        current_time = time.time()
-
-        if player_cache['time'] is None or current_time - player_cache['time'] > cache_expiry_time:
-            random_elo = random.randint(1300, 1700)
+        if player_cache['time'] is None or time.time() - player_cache['time'] > cache_expiry_time:
             try:
-                player_cache['data'] = fetch_players_by_elo(random_elo - 50, random_elo + 50, limit=100)
-                player_cache['time'] = current_time
+                _refresh_player_cache()
+                print(f"Cache refreshed: {player_cache['pool_total']} players")
             except Exception as e:
                 print(f"Cache refresh failed: {e}")
-
         time.sleep(60)
 
 
 threading.Thread(target=update_cache, daemon=True).start()
+
+
+# ---- Matchmaker -------------------------------------------------------------
+# Decay constant controls how strongly we prefer similar-ELO opponents.
+# At |delta|=150 the weight is 1/e (~37%), at 300 it's ~14%, at 600 it's ~2%.
+# That means most matchups land within +/- 200 ELO with occasional wider pairs.
+MATCH_ELO_DECAY = 150.0
+
+
+def _freshness(votes):
+    """Players with few prior votes get bigger weights."""
+    return 1.0 / math.sqrt(1 + (votes or 0))
+
+
+def _weighted_choice(pool, weights, rng=random):
+    """Plain weighted-random pick with a single uniform draw."""
+    total = sum(weights)
+    if total <= 0:
+        return rng.choice(pool)
+    r = rng.random() * total
+    cum = 0.0
+    for item, w in zip(pool, weights):
+        cum += w
+        if r <= cum:
+            return item
+    return pool[-1]
+
+
+def pick_matchup(pool):
+    """Return (player_a, player_b) using freshness + similar-ELO scoring.
+
+    `pool` is a list of (pid, record) tuples. Each record must carry an
+    `_votes` field (cached vote count) and `ELO`. Pool size of ~50+ keeps
+    the random walks interesting; tiny pools still work, they just produce
+    repetitive pairs.
+    """
+    if len(pool) < 2:
+        return None, None
+    freshness = [_freshness(r.get('_votes', 0)) for _, r in pool]
+    a_idx_item = _weighted_choice(list(enumerate(pool)), freshness)
+    a_idx = a_idx_item[0]
+    a_pid, a_rec = pool[a_idx]
+    a_elo = a_rec.get('ELO', 1400)
+
+    # Score every other player by exp(-|dElo|/decay) * freshness.
+    others = []
+    weights = []
+    for i, (pid, rec) in enumerate(pool):
+        if i == a_idx:
+            continue
+        delta = abs(rec.get('ELO', 1400) - a_elo)
+        w = math.exp(-delta / MATCH_ELO_DECAY) * _freshness(rec.get('_votes', 0))
+        others.append((pid, rec))
+        weights.append(w)
+    b_pid, b_rec = _weighted_choice(others, weights)
+    return (a_pid, a_rec), (b_pid, b_rec)
 
 
 '''
@@ -174,7 +254,33 @@ def _players_for_countries(countries):
 
 @app.route('/api/cached_players')
 def cached_players():
+    """Backwards-compatible: returns the full pool. Frontend should prefer
+    /api/next_pair for the smart matchmaker."""
     return jsonify(player_cache['data'])
+
+
+@app.route('/api/next_pair')
+def next_pair_api():
+    """Smart-matched pair of players for the rank page.
+
+    Optional ?match=<fixture_id> restricts the pool to the two countries in
+    that fixture. Without it, the pool is all 1,243 players. The matchmaker
+    biases toward (a) under-voted players and (b) similar-ELO opponents.
+    """
+    pool = list(player_cache.get('data') or [])
+    match_id = request.args.get('match')
+    fixture = None
+    if match_id:
+        fixture = next((f for f in ALL_FIXTURES if f['id'] == match_id), None)
+        if not fixture:
+            return jsonify({"error": "fixture not found"}), 404
+        countries = {fixture['home'], fixture['away']}
+        pool = [(pid, rec) for pid, rec in pool if rec.get('country') in countries]
+
+    a, b = pick_matchup(pool)
+    if not a or not b:
+        return jsonify({"error": "pool too small"}), 503
+    return jsonify({"a": a, "b": b, "fixture": fixture})
 
 
 @app.route('/api/fixtures')
@@ -237,17 +343,160 @@ def best_xi_api():
     return jsonify({"starters": starters, "subs": subs})
 
 
+def _country_to_group():
+    """Map country -> group letter from resolved.json. Cached at module level."""
+    out = {}
+    try:
+        with open(os.path.join(os.path.dirname(__file__), 'resolved.json')) as f:
+            resolved = json.load(f)
+        for country, info in resolved.items():
+            out[country] = info.get('group')
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return out
+
+COUNTRY_GROUP = _country_to_group()
+
+
 @app.route('/api/leaderboard')
 def leaderboard_api():
-    """Return the top-N players by ELO. Firebase is always current because
-    every vote is committed via a transaction in /api/update_data."""
+    """Top players by ELO with optional filters: group, country, position."""
     limit = int(request.args.get('limit', 100))
-    players_ref = db.reference('data/players')
-    raw = players_ref.order_by_child('ELO').start_at(0).end_at(5000).get() or {}
+    group = request.args.get('group')
+    country = request.args.get('country')
+    position = request.args.get('position')
+
+    raw = db.reference('data/players').get() or {}
     if isinstance(raw, list):
         raw = {str(i): v for i, v in enumerate(raw) if v}
-    sorted_players = sorted(raw.items(), key=lambda kv: kv[1].get('ELO', 0), reverse=True)
-    return jsonify(sorted_players[:limit])
+
+    def keep(p):
+        if country and p.get('country') != country:
+            return False
+        if position and p.get('position') != position:
+            return False
+        if group and COUNTRY_GROUP.get(p.get('country')) != group:
+            return False
+        return True
+
+    filtered = [(pid, p) for pid, p in raw.items() if keep(p)]
+    filtered.sort(key=lambda kv: kv[1].get('ELO', 0), reverse=True)
+    return jsonify(filtered[:limit])
+
+
+@app.route('/api/filters')
+def filters_api():
+    """Return the filter option lists the leaderboard UI needs."""
+    countries = sorted(COUNTRY_GROUP.keys())
+    groups = sorted({g for g in COUNTRY_GROUP.values() if g})
+    positions = ['GK', 'DEF', 'MID', 'FWD']
+    return jsonify({"countries": countries, "groups": groups, "positions": positions})
+
+
+@app.route('/api/player/<player_id>')
+def player_api(player_id):
+    """Full profile data for a single player: record, history, rank, W/L."""
+    rec = db.reference(f'data/players/{player_id}').get()
+    if not rec:
+        return jsonify({"error": "not found"}), 404
+
+    history_raw = db.reference(f'data/elo_history/{player_id}').get() or {}
+    if isinstance(history_raw, list):
+        history_raw = {str(i): v for i, v in enumerate(history_raw) if v is not None}
+    history = sorted(((int(ts), elo_val) for ts, elo_val in history_raw.items()), key=lambda x: x[0])
+
+    stats = db.reference(f'data/stats/{player_id}').get() or {}
+
+    # Global rank: how many players have a strictly higher ELO?
+    all_players = db.reference('data/players').get() or {}
+    if isinstance(all_players, list):
+        all_players = {str(i): v for i, v in enumerate(all_players) if v}
+    my_elo = rec.get('ELO', 0)
+    higher = sum(1 for p in all_players.values() if p.get('ELO', 0) > my_elo)
+    rank = higher + 1
+    total = len(all_players)
+
+    # Position rank within the same bucket.
+    pos = rec.get('position')
+    bucket_higher = sum(1 for p in all_players.values()
+                       if p.get('position') == pos and p.get('ELO', 0) > my_elo)
+    bucket_total = sum(1 for p in all_players.values() if p.get('position') == pos)
+
+    # Trend = change over the last ~hour (or earliest sample).
+    trend_window = 60 * 60
+    now_ts = int(time.time())
+    cutoff = now_ts - trend_window
+    earlier = next((elo_val for ts, elo_val in history if ts >= cutoff), None)
+    if earlier is None and history:
+        earlier = history[0][1]
+    trend = (my_elo - earlier) if earlier is not None else 0
+
+    return jsonify({
+        "id": player_id,
+        "player": rec,
+        "rank": rank,
+        "total": total,
+        "position_rank": bucket_higher + 1,
+        "position_total": bucket_total,
+        "wins": stats.get('wins', 0),
+        "losses": stats.get('losses', 0),
+        "history": history,        # list of [ts, elo]
+        "trend_1h": trend,
+    })
+
+
+@app.route('/api/player_summary')
+def player_summary_api():
+    """Lightweight pair-of-players info for the "Why this one?" tooltip."""
+    ids = request.args.get('ids', '').split(',')
+    ids = [i for i in ids if i]
+    if not ids:
+        return jsonify({})
+    out = {}
+    for pid in ids[:2]:
+        history_raw = db.reference(f'data/elo_history/{pid}').get() or {}
+        if isinstance(history_raw, list):
+            history_raw = {str(i): v for i, v in enumerate(history_raw) if v is not None}
+        rec = db.reference(f'data/players/{pid}').get() or {}
+        stats = db.reference(f'data/stats/{pid}').get() or {}
+        cutoff = int(time.time()) - 3600
+        history = sorted(((int(ts), v) for ts, v in history_raw.items()), key=lambda x: x[0])
+        earlier = next((v for ts, v in history if ts >= cutoff), None)
+        if earlier is None and history:
+            earlier = history[0][1]
+        trend = (rec.get('ELO', 0) - earlier) if earlier is not None else 0
+        out[pid] = {
+            "ELO": rec.get('ELO'),
+            "wins": stats.get('wins', 0),
+            "losses": stats.get('losses', 0),
+            "trend_1h": trend,
+        }
+    return jsonify(out)
+
+
+@app.route('/api/search_players')
+def search_players_api():
+    """Substring search across player names. Used by the compare page."""
+    q = (request.args.get('q') or '').strip().lower()
+    if not q or len(q) < 2:
+        return jsonify([])
+    raw = db.reference('data/players').get() or {}
+    if isinstance(raw, list):
+        raw = {str(i): v for i, v in enumerate(raw) if v}
+    matches = []
+    for pid, p in raw.items():
+        if q in (p.get('player_name') or '').lower():
+            matches.append({
+                "id": pid,
+                "player_name": p.get('player_name'),
+                "country": p.get('country'),
+                "club": p.get('club'),
+                "position": p.get('position'),
+                "image_url": p.get('image_url'),
+                "ELO": p.get('ELO'),
+            })
+    matches.sort(key=lambda x: -(x['ELO'] or 0))
+    return jsonify(matches[:15])
 
 
 @app.route('/api/update_data', methods=["POST"])
@@ -288,6 +537,23 @@ def update_data():
     except Exception as e:
         print(f"Vote transaction failed: {e}")
         return jsonify({"error": "Vote failed"}), 500
+
+    # Record win/loss + final ELO so player profile pages can show history,
+    # trends, and W/L records. Stats live alongside per-player stat counters
+    # so reads stay cheap (no aggregation needed at query time).
+    ts = int(time.time())
+    history_updates = {
+        f'data/elo_history/{winning_id}/{ts}': final_win,
+        f'data/elo_history/{losing_id}/{ts}': final_loss,
+    }
+    try:
+        firebase_db.update(history_updates)
+        # Bump W/L counters via transactions so concurrent votes don't lose increments.
+        db.reference(f'data/stats/{winning_id}/wins').transaction(lambda v: (v or 0) + 1)
+        db.reference(f'data/stats/{losing_id}/losses').transaction(lambda v: (v or 0) + 1)
+    except Exception as e:
+        # History/stats are best-effort; don't fail the vote if they error.
+        print(f"History write failed (non-fatal): {e}")
 
     return jsonify({
         "message": "Player data updated successfully",
@@ -377,9 +643,18 @@ def leaderboard():
 def best_xi():
     return render_template("best_xi.html")
 
+@app.route('/player/<player_id>')
+def player_page(player_id):
+    return render_template("player.html", player_id=player_id)
+
+@app.route('/compare')
+def compare_page():
+    return render_template("compare.html")
 
 
-app.run(
-    #host="0.0.0.0", port=5000
-    debug = True, port = 3000
-        )
+
+# When invoked directly (e.g. `python app.py` for local development) we use
+# Flask's dev server with debug reload. In production Render runs gunicorn
+# against this module and imports `app` without executing this block.
+if __name__ == "__main__":
+    app.run(debug=True, port=3000)
