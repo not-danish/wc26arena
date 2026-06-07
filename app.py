@@ -272,6 +272,28 @@ def cached_players():
     return jsonify(player_cache['data'])
 
 
+@app.route('/api/_diag')
+def diag_api():
+    """Production-debug endpoint. Reports cache status + tries a one-shot
+    Firebase read so we can see WHY the cache isn't populating. Safe to leave
+    in: it only exposes cache size and error text, no player data."""
+    info = {
+        "cache_size": len(player_cache.get('data') or []),
+        "cache_age_seconds": (time.time() - player_cache['time']) if player_cache.get('time') else None,
+        "database_url_set": bool(os.getenv('DATABASE_URL')),
+        "fb_key_path_set": bool(os.getenv('FIREBASE_SERVICE_ACCOUNT_KEY')),
+        "fb_json_set": bool(os.getenv('FIREBASE_SERVICE_ACCOUNT_JSON')),
+    }
+    try:
+        sample = db.reference('data/players').limit_to_first(1).get()
+        info["live_read_ok"] = True
+        info["live_read_sample_keys"] = list(sample.keys()) if isinstance(sample, dict) else type(sample).__name__
+    except Exception as e:
+        info["live_read_ok"] = False
+        info["live_read_error"] = f"{type(e).__name__}: {e}"
+    return jsonify(info)
+
+
 @app.route('/api/next_pair')
 def next_pair_api():
     """Smart-matched pair of players for the rank page.
