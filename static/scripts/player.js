@@ -11,13 +11,14 @@
         return n + (last === 1 ? 'st' : last === 2 ? 'nd' : last === 3 ? 'rd' : 'th');
     }
 
-    function chartShell(history) {
-        // Always emit a fixed-size SVG with the data baked into a data
-        // attribute so the hover-tracker can build coordinates the same way
-        // a static render would.
-        const payload = JSON.stringify(history || []);
+    // History is passed in JS memory rather than serialized into a data
+    // attribute; the latter is fragile and was the source of an earlier bug
+    // where all points appeared at the same timestamp.
+    let chartHistory = [];
+
+    function chartShell() {
         return `
-            <div class="wc-chart-wrap" data-history='${payload.replace(/'/g, "&#39;")}'>
+            <div class="wc-chart-wrap">
                 <svg class="wc-chart" viewBox="0 0 600 180" preserveAspectRatio="none">
                     <g class="grid"></g>
                     <path class="line"  fill="none" stroke="#C9A227" stroke-width="1.4"
@@ -42,7 +43,7 @@
     }
 
     function initChart(wrap) {
-        const history = JSON.parse(wrap.dataset.history || '[]');
+        const history = chartHistory;
         const svg = wrap.querySelector('svg');
         const linePath = svg.querySelector('.line');
         const areaPath = svg.querySelector('.area');
@@ -191,7 +192,7 @@
                     </div>
                     <div class="wc-history-card">
                         <h3>ELO history</h3>
-                        ${chartShell(data.history)}
+                        ${chartShell()}
                     </div>
                     <div class="wc-share-row">
                         <a class="wc-btn wc-btn-ghost" href="/compare?a=${esc(data.id)}">Compare →</a>
@@ -210,6 +211,7 @@
                 root.innerHTML = `<div class="wc-loading">Player not found.</div>`;
                 return;
             }
+            chartHistory = data.history || [];
             root.innerHTML = render(data);
             document.title = `${data.player.player_name} · wc26arena`;
             const wrap = root.querySelector('.wc-chart-wrap');
