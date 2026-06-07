@@ -136,7 +136,36 @@ def update_cache():
         time.sleep(60)
 
 
-threading.Thread(target=update_cache, daemon=True).start()
+# Spawn the cache thread lazily on the first request each worker handles.
+# Starting it at import time doesn't work under gunicorn: the thread either
+# runs in the master process (which never serves traffic) or doesn't survive
+# the fork into worker processes. A per-worker lazy start guarantees every
+# process that serves requests also has a cache thread.
+_cache_thread_lock = threading.Lock()
+_cache_thread_started = False
+
+def _ensure_cache_thread():
+    global _cache_thread_started
+    if _cache_thread_started:
+        return
+    with _cache_thread_lock:
+        if _cache_thread_started:
+            return
+        # Prime the cache synchronously on the first call so the very first
+        # /api/next_pair has data immediately, rather than racing the thread.
+        try:
+            _refresh_player_cache()
+            print(f"Cache primed: {player_cache['pool_total']} players")
+        except Exception as e:
+            print(f"Initial cache prime failed: {e}")
+        threading.Thread(target=update_cache, daemon=True,
+                         name="cache-refresh").start()
+        _cache_thread_started = True
+
+
+@app.before_request
+def _boot_cache_thread():
+    _ensure_cache_thread()
 
 
 # ---- Matchmaker -------------------------------------------------------------
