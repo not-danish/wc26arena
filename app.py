@@ -424,19 +424,23 @@ def best_xi_api():
     return jsonify({"starters": starters, "subs": subs})
 
 
-def _country_to_group():
-    """Map country -> group letter from resolved.json. Cached at module level."""
-    out = {}
-    try:
-        with open(os.path.join(os.path.dirname(__file__), 'resolved.json')) as f:
-            resolved = json.load(f)
-        for country, info in resolved.items():
-            out[country] = info.get('group')
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-    return out
-
-COUNTRY_GROUP = _country_to_group()
+# Country -> group letter for the 2026 World Cup. Static because squads
+# are fixed for the tournament. (Previously read from resolved.json, but
+# that file is a one-off seed artefact and isn't deployed to production.)
+COUNTRY_GROUP = {
+    'Algeria': 'J', 'Argentina': 'J', 'Australia': 'D', 'Austria': 'J',
+    'Belgium': 'G', 'Bosnia and Herzegovina': 'B', 'Brazil': 'C',
+    'Canada': 'B', 'Cape Verde': 'H', 'Colombia': 'K', 'Croatia': 'L',
+    'Curaçao': 'E', 'Czech Republic': 'A', 'DR Congo': 'K', 'Ecuador': 'E',
+    'Egypt': 'G', 'England': 'L', 'France': 'I', 'Germany': 'E',
+    'Ghana': 'L', 'Haiti': 'C', 'Iran': 'G', 'Iraq': 'I', 'Ivory Coast': 'E',
+    'Japan': 'F', 'Jordan': 'J', 'Mexico': 'A', 'Morocco': 'C',
+    'Netherlands': 'F', 'New Zealand': 'G', 'Norway': 'I', 'Panama': 'L',
+    'Paraguay': 'D', 'Portugal': 'K', 'Qatar': 'B', 'Saudi Arabia': 'H',
+    'Scotland': 'C', 'Senegal': 'I', 'South Africa': 'A', 'South Korea': 'A',
+    'Spain': 'H', 'Sweden': 'F', 'Switzerland': 'B', 'Tunisia': 'F',
+    'Turkey': 'D', 'United States': 'D', 'Uruguay': 'H', 'Uzbekistan': 'K',
+}
 
 
 @app.route('/api/leaderboard')
