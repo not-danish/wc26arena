@@ -334,6 +334,18 @@ a:hover { color: var(--wc-gold-bright); }
   max-width: 540px;
   line-height: 1.5;
 }
+/* Tagline lives between the headline and the descriptive paragraph: it's
+ * the value prop in 5 words so Reddit-tier visitors instantly grok the site. */
+.wc-hero p.wc-tagline {
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  letter-spacing: 0.06em;
+  color: var(--wc-white);
+  margin: 1.25rem 0 0.5rem;
+  text-transform: uppercase;
+  max-width: 640px;
+}
+.wc-hero p.wc-tagline + p { margin-top: 0.75rem; }
 
 /* Host-nation color strip beneath the hero copy. */
 .wc-nations {
