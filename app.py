@@ -326,6 +326,45 @@ def total_votes_api():
     return jsonify({"total": base + votes_since_refresh})
 
 
+# -------------------- Higher-or-lower streaks --------------------
+
+def _today_key():
+    """YYYY-MM-DD in UTC, for daily-leaderboard partitioning."""
+    return datetime.now(timezone.utc).strftime('%Y-%m-%d')
+
+
+@app.route('/api/streaks', methods=['POST'])
+def submit_streak():
+    """Record a higher-or-lower streak for today's leaderboard.
+
+    Body: {"name": "Danish", "streak": 12}. Trivial validation only — this is
+    a vanity leaderboard, not a high-stakes contest.
+    """
+    data = request.get_json(silent=True) or {}
+    name = (data.get('name') or '').strip()[:24]
+    try:
+        streak = int(data.get('streak') or 0)
+    except (TypeError, ValueError):
+        streak = 0
+    if not name or streak <= 0:
+        return jsonify({"error": "name and streak required"}), 400
+    entry = {"name": name, "streak": streak, "ts": int(time.time())}
+    db.reference(f'data/streaks/{_today_key()}').push(entry)
+    return jsonify({"ok": True})
+
+
+@app.route('/api/streaks/today')
+def streaks_today():
+    """Top N streaks for today, descending."""
+    limit = max(1, min(50, int(request.args.get('limit', 10))))
+    raw = db.reference(f'data/streaks/{_today_key()}').get() or {}
+    if isinstance(raw, list):
+        raw = {str(i): v for i, v in enumerate(raw) if v}
+    rows = list(raw.values())
+    rows.sort(key=lambda r: (-(r.get('streak') or 0), r.get('ts') or 0))
+    return jsonify(rows[:limit])
+
+
 @app.route('/api/_diag')
 def diag_api():
     """Production-debug endpoint. Reports cache status + tries a one-shot
@@ -778,6 +817,10 @@ def compare_page():
 @app.route('/fixtures')
 def fixtures_page():
     return render_template("fixtures.html")
+
+@app.route('/play')
+def play_page():
+    return render_template("play.html")
 
 
 

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block header_content %}
+<section class="wc-play-page">
+    <div class="wc-play-heading animate__animated animate__fadeInDown">
+        <h1>Higher or Lower</h1>
+        <p>Guess if the mystery player's ELO is higher or lower. Build a streak.</p>
+    </div>
+
+    <div class="wc-play-hud">
+        <div class="wc-play-stat">
+            <span class="label">Streak</span>
+            <span class="value" id="wc_play_streak">0</span>
+        </div>
+        <div class="wc-play-stat">
+            <span class="label">Best today</span>
+            <span class="value" id="wc_play_best">0</span>
+        </div>
+    </div>
+
+    <div class="wc-play-board" id="wc_play_board">
+        <div class="wc-loading">Loading matchup…</div>
+    </div>
+
+    <div class="wc-play-footer">
+        <div class="wc-play-leaderboard">
+            <h3>Today's best streaks</h3>
+            <ol id="wc_play_top"><li class="muted">Loading…</li></ol>
+        </div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/play.js') }}"></script>
+{% endblock %}
