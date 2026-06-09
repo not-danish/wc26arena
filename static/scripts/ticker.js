@@ -108,7 +108,7 @@ async function loadTicker() {
     if (!track) return;
     let fixtures;
     try {
-        fixtures = await fetch('/api/fixtures?limit=10').then(r => r.json());
+        fixtures = await fetch('/api/fixtures?limit=30').then(r => r.json());
     } catch {
         track.innerHTML = '<span class="wc-ticker-loading">Fixtures unavailable</span>';
         return;
@@ -133,9 +133,17 @@ async function loadTicker() {
             </a>`;
     }).join('');
 
+    // "All fixtures" tail pill so far-future matches (e.g. teams in groups
+    // K–L) are still reachable when their match falls off the marquee.
+    const allHtml = `
+        <a class="wc-ticker-pill wc-ticker-pill-all" href="/fixtures">
+            <span class="wc-ticker-day">All</span>
+            <span>View every fixture →</span>
+        </a>`;
+
     // Duplicate the pill list once so the marquee can loop without a visible
     // gap when the first copy scrolls off-screen.
-    track.innerHTML = pillHtml + pillHtml;
+    track.innerHTML = pillHtml + allHtml + pillHtml + allHtml;
 }
 
 loadTicker();

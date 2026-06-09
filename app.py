@@ -391,8 +391,16 @@ def next_pair_api():
 
 @app.route('/api/fixtures')
 def fixtures_api():
-    """Upcoming fixtures for the ticker."""
-    return jsonify(_upcoming_fixtures(limit=int(request.args.get('limit', 10))))
+    """Upcoming fixtures. ?limit=all returns every remaining fixture."""
+    raw = request.args.get('limit', '30')
+    if raw == 'all':
+        limit = len(ALL_FIXTURES) or 200
+    else:
+        try:
+            limit = int(raw)
+        except ValueError:
+            limit = 30
+    return jsonify(_upcoming_fixtures(limit=limit))
 
 
 @app.route('/api/fixture_players')
@@ -766,6 +774,10 @@ def player_page(player_id):
 @app.route('/compare')
 def compare_page():
     return render_template("compare.html")
+
+@app.route('/fixtures')
+def fixtures_page():
+    return render_template("fixtures.html")
 
 
 

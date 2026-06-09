@@ -278,6 +278,17 @@ a:hover { color: var(--wc-gold-bright); }
   opacity: 1;
   transform: translate(0, -50%);
 }
+/* Trailing "view all" pill: gold-tinted to stand out from regular fixtures. */
+.wc-ticker-pill-all {
+  background: rgba(201, 162, 39, 0.18);
+  color: var(--wc-gold-bright);
+}
+.wc-ticker-pill-all::after { display: none; }
+.wc-ticker-pill-all:hover {
+  background: var(--wc-gold);
+  color: var(--wc-black);
+  padding-right: 1rem;
+}
 .wc-ticker-day {
   font-size: 0.75rem;
   letter-spacing: 0.18em;
@@ -1343,6 +1354,96 @@ a:hover { color: var(--wc-gold-bright); }
 .wc-share-row button:hover {
   background: var(--wc-gold);
   color: var(--wc-black);
+}
+
+/* ============ Fixtures page ============ */
+.wc-fixtures-page {
+  min-height: 100vh;
+  padding: calc(var(--wc-nav-height) + var(--wc-ticker-height) + 3rem) 1.5rem 4rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.wc-fixtures-controls {
+  max-width: 480px;
+  margin: 0 auto 2rem;
+}
+.wc-fixtures-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.wc-fixtures-date {
+  font-family: var(--font-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  color: var(--wc-gold);
+  margin: 1.25rem 0 0.25rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--wc-border);
+}
+.wc-fixtures-date:first-child { margin-top: 0; }
+
+.wc-fixture-card {
+  display: grid;
+  grid-template-columns: 90px 1fr auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  text-decoration: none;
+  color: var(--wc-white);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.wc-fixture-card:hover {
+  border-color: var(--wc-gold);
+  background: rgba(201, 162, 39, 0.06);
+  transform: translateX(4px);
+}
+.wc-fixture-time {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  font-size: 0.9rem;
+  color: var(--wc-gold-bright);
+}
+.wc-fixture-teams {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.06em;
+  font-size: 1.1rem;
+  text-transform: uppercase;
+}
+.wc-fixture-teams .team { color: var(--wc-white); }
+.wc-fixture-teams .vs {
+  color: var(--wc-text-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+}
+.wc-fixture-venue {
+  grid-column: 2;
+  font-size: 0.8rem;
+  color: var(--wc-text-muted);
+  letter-spacing: 0.05em;
+}
+.wc-fixture-cta {
+  grid-column: 3;
+  grid-row: 1 / span 2;
+  font-family: var(--font-display);
+  font-size: 0.75rem;
+  letter-spacing: 0.15em;
+  color: var(--wc-gold);
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.wc-fixture-card:hover .wc-fixture-cta { opacity: 1; }
+
+@media (max-width: 640px) {
+  .wc-fixture-card { grid-template-columns: 70px 1fr; }
+  .wc-fixture-cta { display: none; }
+  .wc-fixture-venue { grid-column: 1 / -1; padding-left: 70px; }
 }
 
 /* ============ Helpers ============ */

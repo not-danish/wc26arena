@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block header_content %}
+<section class="wc-fixtures-page">
+    <div class="wc-bestxi-heading animate__animated animate__fadeInDown">
+        <h1>All Fixtures</h1>
+        <p>Tap any match to rank only its players</p>
+    </div>
+
+    <div class="wc-fixtures-controls">
+        <input type="search" id="wc_fx_search" class="wc-compare-search"
+               placeholder="Search by country…" autocomplete="off">
+    </div>
+
+    <div id="wc_fixtures_list" class="wc-fixtures-list">
+        <div class="wc-loading">Loading fixtures…</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/fixtures.js') }}"></script>
+{% endblock %}
