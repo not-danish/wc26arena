@@ -524,6 +524,34 @@ a:hover { color: var(--wc-gold-bright); }
   text-align: center;
 }
 
+/* Secondary action under the two cards. Intentionally muted so it doesn't
+ * pull attention from the primary "tap a card" gesture. */
+.wc-skip-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 2rem;
+}
+.wc-skip-btn {
+  background: transparent;
+  border: 1px solid var(--wc-border);
+  color: var(--wc-text-muted);
+  font-family: var(--font-display);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  padding: 0.6rem 1.25rem;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+.wc-skip-btn:hover {
+  color: var(--wc-gold);
+  border-color: var(--wc-gold);
+}
+.wc-skip-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 /* ============ Leaderboard ============ */
 .wc-leaderboard-page {
   min-height: 100vh;

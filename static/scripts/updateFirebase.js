@@ -39,18 +39,36 @@ function accentForCountry(country) {
 function showGrid() {
     const grid = document.getElementById('player_grid');
     const loading = document.getElementById('loading_message');
+    const skip = document.getElementById('wc_skip_row');
     if (grid) grid.classList.remove('hidden');
     if (loading) loading.classList.add('hidden');
+    if (skip) skip.classList.remove('hidden');
 }
 
 function showLoading(message) {
     const grid = document.getElementById('player_grid');
     const loading = document.getElementById('loading_message');
+    const skip = document.getElementById('wc_skip_row');
     if (grid) grid.classList.add('hidden');
+    if (skip) skip.classList.add('hidden');
     if (loading) { loading.classList.remove('hidden'); loading.textContent = message; }
 }
 
 let transitioning = false;
+
+// Fade out both cards and load the next pair. Used by both the click-to-vote
+// flow and the skip button, so the visual transition stays consistent.
+function transitionToNextPair() {
+    if (transitioning) return;
+    transitioning = true;
+    for (const slot of [1, 2]) {
+        const el = document.getElementById(`player_${slot}_card`);
+        if (!el) continue;
+        el.classList.replace('animate__slower', 'animate__fast');
+        el.classList.add('animate__fadeOut');
+    }
+    setTimeout(renderPair, 600);
+}
 
 function resetCard(slot) {
     const old = document.getElementById(`player_${slot}_card`);
@@ -150,8 +168,6 @@ async function renderPair() {
 
         cardEl.addEventListener('click', () => {
             if (transitioning) return;
-            transitioning = true;
-
             const winner = pair[i];
             const loser = pair[i === 0 ? 1 : 0];
             sendVote({
@@ -160,12 +176,7 @@ async function renderPair() {
                 losing_id: loser[0],
                 losing_elo: loser[1].ELO,
             });
-
-            for (const el of cards) {
-                el.classList.replace('animate__slower', 'animate__fast');
-                el.classList.add('animate__fadeOut');
-            }
-            setTimeout(renderPair, 600);
+            transitionToNextPair();
         });
     }
 }
@@ -182,5 +193,9 @@ async function sendVote(payload) {
         console.error('Error sending vote:', error);
     }
 }
+
+document.getElementById('wc_skip_btn')?.addEventListener('click', () => {
+    transitionToNextPair();
+});
 
 renderPair();
