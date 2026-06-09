@@ -98,8 +98,13 @@ def fetch_players_by_elo(min_elo, max_elo, **kwargs):
 player_cache = {
     'data': [],          # list of (pid, record_with_vote_count) sorted by ELO
     'pool_total': 0,     # cached size, for sanity-checking
+    'total_votes': 0,    # sum of wins+losses at last refresh
     'time': None,
 }
+# Incremented on every vote so the public counter feels live between cache
+# refreshes. Reset to 0 at each refresh because the cache reads the fresh
+# total straight from Firebase.
+votes_since_refresh = 0
 cache_expiry_time = 300
 import math  # noqa: E402  (kept here next to where it's used)
 
@@ -113,16 +118,23 @@ def _refresh_player_cache():
     if isinstance(stats, list):
         stats = {str(i): v for i, v in enumerate(stats) if v}
 
+    global votes_since_refresh
     enriched = []
+    total_votes = 0
     for pid, p in raw.items():
         s = stats.get(pid) or {}
         votes = (s.get('wins') or 0) + (s.get('losses') or 0)
+        total_votes += votes
         enriched.append((pid, {**p, '_votes': votes}))
     enriched.sort(key=lambda kv: kv[1].get('ELO', 0), reverse=True)
 
     player_cache['data'] = enriched
     player_cache['pool_total'] = len(enriched)
+    # Each vote is two stat increments (winner.wins + loser.losses) but counts
+    # as a single user action, so divide by 2 for the public-facing tally.
+    player_cache['total_votes'] = total_votes // 2
     player_cache['time'] = time.time()
+    votes_since_refresh = 0
 
 
 def update_cache():
@@ -299,6 +311,19 @@ def cached_players():
     """Backwards-compatible: returns the full pool. Frontend should prefer
     /api/next_pair for the smart matchmaker."""
     return jsonify(player_cache['data'])
+
+
+@app.route('/api/total_votes')
+def total_votes_api():
+    """Public vote counter for the nav bubble.
+
+    Sum of the last cache snapshot's Firebase total plus any votes counted
+    by this process since that refresh. Approximate across multiple workers
+    (each has its own delta), but always converges to the truth after the
+    next cache refresh.
+    """
+    base = player_cache.get('total_votes') or 0
+    return jsonify({"total": base + votes_since_refresh})
 
 
 @app.route('/api/_diag')
@@ -639,6 +664,12 @@ def update_data():
     except Exception as e:
         # History/stats are best-effort; don't fail the vote if they error.
         print(f"History write failed (non-fatal): {e}")
+
+    # Bump the public-facing live counter. This is per-process state, so
+    # gunicorn workers each track their own delta; the next cache refresh
+    # reconciles to the true Firebase total either way.
+    global votes_since_refresh
+    votes_since_refresh += 1
 
     return jsonify({
         "message": "Player data updated successfully",

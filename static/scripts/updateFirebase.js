@@ -188,7 +188,10 @@ async function sendVote(payload) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
         });
-        if (resp.ok && window.WCStreak) window.WCStreak.record();
+        if (resp.ok) {
+            if (window.WCStreak) window.WCStreak.record();
+            if (window.WCTally) window.WCTally.bump();
+        }
     } catch (error) {
         console.error('Error sending vote:', error);
     }

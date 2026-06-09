@@ -124,6 +124,56 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-nav-links a:hover::after { transform: scaleX(1); }
 
+/* Live vote tally pill in the nav. The dot pulses to signal "live data". */
+.wc-nav-tally a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.3rem 0.7rem 0.3rem 0.55rem;
+  border: 1px solid var(--wc-gold);
+  background: rgba(201, 162, 39, 0.08);
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--wc-gold-bright) !important;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+.wc-nav-tally a::after { display: none; }
+.wc-nav-tally a:hover { background: rgba(201, 162, 39, 0.2); }
+.wc-nav-tally .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--wc-gold-bright);
+  box-shadow: 0 0 8px rgba(232, 197, 71, 0.7);
+  animation: wc-tally-pulse 2s ease-in-out infinite;
+}
+.wc-nav-tally .count {
+  color: var(--wc-white);
+  font-size: 1.05rem;
+  letter-spacing: 0.04em;
+  min-width: 1.5ch;
+  display: inline-block;
+  text-align: right;
+  transition: color 0.3s ease;
+}
+.wc-nav-tally .count.bump {
+  color: var(--wc-gold-bright);
+  text-shadow: 0 0 12px rgba(232, 197, 71, 0.6);
+}
+.wc-nav-tally .label {
+  color: var(--wc-text-muted);
+  font-size: 0.8rem;
+  letter-spacing: 0.15em;
+}
+@keyframes wc-tally-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+@media (max-width: 768px) {
+  /* Hide the tally on narrow screens so the rest of the nav fits. */
+  .wc-nav-tally { display: none; }
+}
+
 /* ============ Fixtures ticker ============ */
 .wc-ticker {
   position: fixed;
