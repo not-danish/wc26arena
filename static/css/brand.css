@@ -1456,3 +1456,241 @@ a:hover { color: var(--wc-gold-bright); }
   .wc-hero-inner { padding: 0 1.5rem; }
   .wc-nav { padding: 1rem 1.5rem; }
 }
+
+/* =========================================================================
+ * MOBILE POLISH PASS
+ * Three breakpoints, narrowest-last:
+ *   - <= 900px: tablet portrait, big phones landscape
+ *   - <= 640px: most phones in portrait
+ *   - <= 380px: small / older phones
+ *
+ * Everything in here is a refinement of the desktop layout. Keep edits
+ * scoped to specific selectors so nothing here bleeds into desktop.
+ * ========================================================================= */
+
+@media (max-width: 900px) {
+  /* Nav: drop padding, shrink brand, compact links. The tally is already
+     hidden under 768px elsewhere in this file. */
+  .wc-nav {
+    padding: 0 1rem;
+  }
+  .wc-brand        { font-size: 1.2rem; }
+  .wc-brand-mark   { font-size: 1rem; padding: 0.05rem 0.4rem; }
+  .wc-nav-links    { gap: 0.85rem; font-size: 0.85rem; }
+  .wc-nav-links a  { padding: 0.2rem 0; }
+
+  /* Ticker: smaller pills, smaller label */
+  .wc-ticker-label::before { font-size: 0.55rem; letter-spacing: 0.14em; }
+  .wc-ticker-label::after  { font-size: 0.7rem; }
+  .wc-ticker-label { padding: 0 0.7rem; }
+  .wc-ticker-pill  { font-size: 0.85rem; padding: 0 0.85rem; gap: 0.4rem; }
+  .wc-ticker-day   { font-size: 0.65rem; padding: 0.08rem 0.35rem; }
+  .wc-ticker-time  { font-size: 0.65rem; margin-left: 0.3rem; }
+
+  /* Hero: tighter spacing */
+  .wc-hero h1 { font-size: clamp(2.6rem, 8vw, 5rem); }
+  .wc-hero p  { font-size: 1.05rem; margin: 1rem 0 1.75rem; }
+  .wc-hero p.wc-tagline { font-size: clamp(1.1rem, 3.5vw, 1.5rem); }
+  .wc-btn { padding: 0.85rem 1.6rem; font-size: 1rem; }
+
+  /* Rank page: tighten the heading + card column */
+  .wc-rank-page { padding-left: 1rem; padding-right: 1rem; }
+  .wc-rank-heading h1 { font-size: clamp(2rem, 6vw, 3rem); }
+
+  /* Leaderboard: still a table, just smaller */
+  .wc-leaderboard-page { padding-left: 1rem; padding-right: 1rem; }
+  .wc-table thead th { font-size: 0.7rem; padding: 0.7rem 0.6rem; letter-spacing: 0.12em; }
+  .wc-table tbody td { padding: 0.55rem 0.6rem; font-size: 0.85rem; }
+  .wc-rank { font-size: 1.1rem; width: 2.5rem; }
+  .wc-elo  { font-size: 1.1rem; }
+  .wc-player-cell img { width: 36px; height: 36px; }
+
+  /* Best XI pitch: smaller frame photos */
+  .wc-bestxi-page { padding-left: 1rem; padding-right: 1rem; }
+  .wc-pitch-photo { width: 64px; height: 64px; }
+  .wc-pitch-name-tag { min-width: 80px; padding: 0.18rem 0.45rem; }
+  .wc-pitch-name-tag .name { font-size: 0.7rem; max-width: 90px; }
+  .wc-pitch-name-tag .stat { font-size: 0.6rem; }
+  .wc-row-fwd { top: 4%; } .wc-row-mid { top: 28%; }
+  .wc-row-def { top: 54%; } .wc-row-gk  { top: 82%; }
+
+  /* Subs row: smaller cards */
+  .wc-sub-card .wc-pitch-photo { width: 50px; height: 50px; }
+  .wc-sub-card .name { font-size: 0.75rem; }
+  .wc-sub-card .elo  { font-size: 0.7rem; }
+}
+
+@media (max-width: 640px) {
+  /* Nav links: only show essentials. Compare and Best XI hide; users can
+     still reach them via the Home page or by sharing direct links. */
+  .wc-nav { padding: 0 0.75rem; }
+  .wc-brand {
+    font-size: 1.05rem;
+    letter-spacing: 0.05em;
+    gap: 0.4rem;
+  }
+  /* Hide ".COM" if it's ever re-added; trim to just the wordmark */
+  .wc-brand-tld { display: none; }
+  .wc-nav-links { gap: 0.6rem; font-size: 0.7rem; letter-spacing: 0.1em; }
+  .wc-nav-links a::after { display: none; }
+
+  /* Ticker: compress further */
+  .wc-ticker { height: 38px; }
+  .wc-ticker-pill { font-size: 0.75rem; padding: 0 0.7rem; gap: 0.3rem; }
+  .wc-ticker-day { font-size: 0.6rem; }
+  .wc-ticker-time { display: none; }   /* save space on tiny screens */
+  .wc-ticker-vs { display: none; }
+  .wc-ticker-flag { font-size: 0.95rem; }
+  .wc-ticker-label::before { display: none; }  /* drop the "tap a match" hint */
+  .wc-ticker-label::after  { font-size: 0.6rem; letter-spacing: 0.06em; }
+  .wc-ticker-label { padding: 0 0.5rem; }
+
+  /* Recompute room for the fixed bars (they got shorter) */
+  :root {
+    --wc-nav-height: 56px;
+    --wc-ticker-height: 38px;
+  }
+
+  /* Hero: tighter still, button full-width-ish */
+  .wc-hero-inner { padding: 0 1.25rem; }
+  .wc-eyebrow { font-size: 0.75rem; letter-spacing: 0.15em; padding: 0.25rem 0.55rem; }
+  .wc-hero h1 { font-size: clamp(2.4rem, 12vw, 4rem); }
+  .wc-hero p  { font-size: 0.95rem; max-width: 100%; }
+  .wc-hero p.wc-tagline { font-size: 1.1rem; }
+  .wc-nations span { flex-basis: 60px; }
+
+  /* Rank page: single column already (768px rule above), but tighten the
+     gap between cards and bump touch targets. */
+  .wc-versus { gap: 1rem; }
+  .wc-versus .vs-divider { font-size: 1.8rem; padding: 0.5rem 0; }
+  .wc-card { padding: 1.5rem 1.25rem 1.75rem; }
+  .wc-card-img-frame { width: 160px; height: 160px; margin-bottom: 1rem; }
+  .wc-card .wc-name { font-size: 1.7rem; }
+  .wc-card .wc-meta { font-size: 0.85rem; }
+  .wc-card .wc-position { font-size: 0.7rem; padding: 0.2rem 0.6rem; letter-spacing: 0.14em; }
+
+  /* Hover-only "Tap to vote" hint isn't useful on touch — replace with
+     a permanent label so users know cards are tappable. */
+  .wc-card .wc-select-hint { opacity: 1; color: var(--wc-gold); font-size: 0.75rem; margin-top: 0.85rem; }
+
+  /* Filter banner: stack vertically */
+  .wc-filter-banner { flex-direction: column; align-items: flex-start; gap: 0.5rem; padding: 0.7rem 0.85rem; }
+  .wc-filter-banner .matchup { font-size: 0.95rem; }
+
+  /* LEADERBOARD — collapse the table to a stacked card per row so it's
+     actually readable on a phone. */
+  .wc-leaderboard-heading h1 { font-size: 2rem; }
+  .wc-filter-row { gap: 0.5rem; }
+  .wc-filter-row select { min-width: 0; flex: 1 1 calc(50% - 0.5rem); font-size: 0.85rem; padding: 0.45rem 1.6rem 0.45rem 0.7rem; }
+  .wc-filter-row .reset { flex: 1 1 100%; }
+
+  .wc-table, .wc-table thead, .wc-table tbody, .wc-table tr, .wc-table th, .wc-table td {
+    display: block;
+    width: 100%;
+  }
+  .wc-table thead { display: none; }   /* labels embedded into each cell */
+  .wc-table tr {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid var(--wc-border);
+    display: grid;
+    grid-template-columns: 2.5rem 1fr auto;
+    grid-template-areas:
+      "rank player elo"
+      "rank meta meta";
+    gap: 0.3rem 0.85rem;
+    align-items: center;
+  }
+  .wc-table tr:hover { background: rgba(201,162,39,0.05); }
+  .wc-table tbody td { padding: 0; border-bottom: none; }
+  /* Map each cell into a grid area by position (1st=rank, 2nd=player, ...) */
+  .wc-table tbody td:nth-child(1) { grid-area: rank; }
+  .wc-table tbody td:nth-child(2) { grid-area: player; }
+  .wc-table tbody td:nth-child(3),
+  .wc-table tbody td:nth-child(4),
+  .wc-table tbody td:nth-child(5) { grid-area: meta; display: inline-block; margin-right: 0.6rem; color: var(--wc-text-muted); font-size: 0.78rem; }
+  .wc-table tbody td:nth-child(6) { grid-area: elo; }
+  .wc-rank { font-size: 1.4rem; width: auto; }
+  .wc-elo  { font-size: 1.25rem; }
+  .wc-player-cell img { width: 40px; height: 40px; }
+  .wc-player-cell .wc-player-name { font-size: 0.95rem; }
+  .wc-chip { font-size: 0.65rem; padding: 0.15rem 0.45rem; }
+
+  /* Best XI: stack pitch + subs; portrait pitch reads better on phones */
+  .wc-bestxi-heading h1 { font-size: 2rem; }
+  .wc-pitch-wrap { aspect-ratio: 3 / 4; max-width: 100%; }
+  .wc-pitch-photo { width: 52px; height: 52px; border-width: 2px; }
+  .wc-pitch-name-tag { min-width: 68px; padding: 0.12rem 0.35rem; }
+  .wc-pitch-name-tag .name { font-size: 0.6rem; max-width: 70px; letter-spacing: 0.02em; }
+  .wc-pitch-name-tag .stat { font-size: 0.52rem; gap: 0.2rem; }
+  /* Re-stretch the rows for portrait pitch */
+  .wc-row-fwd { top: 6%; }
+  .wc-row-mid { top: 30%; }
+  .wc-row-def { top: 56%; }
+  .wc-row-gk  { top: 82%; }
+  .wc-subs h2 { font-size: 1.2rem; }
+  .wc-subs-row { grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 0.5rem; }
+  .wc-sub-card { padding: 0.6rem; }
+  .wc-sub-card .wc-pitch-photo { width: 44px; height: 44px; }
+
+  /* Compare page: stack slots (already done in older breakpoint), tighter */
+  .wc-compare-page { padding-left: 1rem; padding-right: 1rem; }
+  .wc-compare-slot { padding: 1rem; }
+  .wc-compare-player .wc-pitch-photo { width: 100px; height: 100px; }
+  .wc-compare-player .name { font-size: 1.1rem; }
+
+  /* Player profile: tighten stat blocks */
+  .wc-profile-page { padding-left: 1rem; padding-right: 1rem; }
+  .wc-profile-img { width: 150px; height: 150px; border-width: 3px; }
+  .wc-profile-name { font-size: 1.5rem; }
+  .wc-profile-stats { gap: 0.6rem; }
+  .wc-stat-block { padding: 0.85rem; }
+  .wc-stat-block .value { font-size: 1.7rem; }
+  .wc-stat-block .label { font-size: 0.62rem; letter-spacing: 0.15em; }
+  .wc-stat-block .sub   { font-size: 0.72rem; }
+  .wc-chart-wrap { height: 160px; }
+
+  /* Fixtures page: shrink everything */
+  .wc-fixtures-page { padding-left: 0.85rem; padding-right: 0.85rem; }
+  .wc-fixture-card { gap: 0.6rem; padding: 0.7rem 0.85rem; }
+  .wc-fixture-teams { font-size: 0.95rem; gap: 0.35rem; }
+  .wc-fixture-time { font-size: 0.8rem; }
+
+  /* Streak bubble: don't let it overlap the rank cards */
+  .wc-streak { bottom: 1rem; right: 1rem; padding: 0.45rem 0.85rem; font-size: 0.8rem; }
+  .wc-streak .count { font-size: 1.1rem; }
+
+  /* Footer host strip */
+  .wc-footer-strip { height: 5px; }
+}
+
+/* Touch-only: cards should react instantly to a tap. Hover styles only kick
+ * in for devices with a real pointer (mouse). This is the modern "hover:
+ * hover" / "any-pointer: fine" media query pattern. */
+@media (hover: none) {
+  /* Replace the desktop hover-shimmer with a press state */
+  .wc-card { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .wc-card:active {
+    transform: scale(0.98);
+    box-shadow: 0 6px 18px rgba(201, 162, 39, 0.25);
+    border-color: var(--wc-gold);
+  }
+  /* Disable the persistent hover lift on Best XI players */
+  .wc-pitch-player:hover { transform: none; }
+  .wc-pitch-player:active { transform: scale(0.95); }
+
+  /* Default iOS tap highlight is an ugly translucent black — kill it. */
+  a, button, .wc-card { -webkit-tap-highlight-color: transparent; }
+}
+
+@media (max-width: 380px) {
+  /* Tiny phones: hide one more nav item to fit */
+  .wc-nav-links { font-size: 0.65rem; gap: 0.5rem; }
+  .wc-nav-links li:nth-last-child(2) { display: none; } /* hides Compare */
+  .wc-brand { font-size: 0.95rem; }
+  .wc-brand-mark { font-size: 0.85rem; padding: 0 0.3rem; }
+
+  .wc-card-img-frame { width: 130px; height: 130px; }
+  .wc-card .wc-name { font-size: 1.4rem; }
+
+  .wc-ticker-flag { font-size: 0.85rem; }
+}
