@@ -124,6 +124,26 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-nav-links a:hover::after { transform: scaleX(1); }
 
+/* ---------- Secondary nav group ---------- */
+/* A thin vertical divider that separates primary from secondary links so
+ * the demotion reads visually instead of just being a font-size change. */
+.wc-nav-sep {
+  width: 1px;
+  height: 1.1rem;
+  background: var(--wc-border);
+  margin: 0 0.25rem;
+  align-self: center;
+  display: block;
+}
+/* Secondary links: smaller, muted, same gold-underline hover so they still
+ * feel like first-class destinations, just visually de-emphasised. */
+.wc-nav-secondary a {
+  font-size: 0.85rem;
+  letter-spacing: 0.1em;
+  color: var(--wc-text-muted);
+}
+.wc-nav-secondary a:hover { color: var(--wc-gold-bright); }
+
 /* Live vote tally pill in the nav. The dot pulses to signal "live data". */
 .wc-nav-tally a {
   display: inline-flex;
@@ -2020,9 +2040,11 @@ a:hover { color: var(--wc-gold-bright); }
 }
 
 @media (max-width: 380px) {
-  /* Tiny phones: hide one more nav item to fit */
+  /* Tiny phones: hide the secondary nav group entirely. Fixtures and Compare
+   * are still reachable from the homepage (or via direct link). */
   .wc-nav-links { font-size: 0.65rem; gap: 0.5rem; }
-  .wc-nav-links li:nth-last-child(2) { display: none; } /* hides Compare */
+  .wc-nav-sep,
+  .wc-nav-secondary { display: none; }
   .wc-brand { font-size: 0.95rem; }
   .wc-brand-mark { font-size: 0.85rem; padding: 0 0.3rem; }
 
