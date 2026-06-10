@@ -101,11 +101,15 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-nav-links {
   display: flex;
-  gap: 2rem;
+  align-items: center;
+  gap: 2.25rem;       /* between groups */
   font-family: var(--font-display);
   letter-spacing: 0.12em;
   font-size: 1.05rem;
   text-transform: uppercase;
+  list-style: none;
+  padding: 0;
+  margin: 0;
 }
 .wc-nav-links a {
   position: relative;
@@ -187,32 +191,6 @@ a:hover { color: var(--wc-gold-bright); }
   height: var(--wc-ticker-height);
   overflow: hidden;
 }
-.wc-ticker-label {
-  flex: 0 0 auto;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 0 1rem;
-  font-family: var(--font-display);
-  color: var(--wc-black);
-  background: var(--wc-gold);
-  z-index: 2;
-  line-height: 1.1;
-}
-.wc-ticker-label::before {
-  content: 'Tap a match';
-  font-size: 0.65rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  opacity: 0.75;
-}
-.wc-ticker-label::after {
-  content: 'to rank its players →';
-  font-size: 0.85rem;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
 .wc-ticker-track {
   flex: 1 1 auto;
   display: flex;
@@ -278,16 +256,73 @@ a:hover { color: var(--wc-gold-bright); }
   opacity: 1;
   transform: translate(0, -50%);
 }
-/* Trailing "view all" pill: gold-tinted to stand out from regular fixtures. */
-.wc-ticker-pill-all {
-  background: rgba(201, 162, 39, 0.18);
-  color: var(--wc-gold-bright);
-}
-.wc-ticker-pill-all::after { display: none; }
-.wc-ticker-pill-all:hover {
-  background: var(--wc-gold);
+/* Single solid-gold anchor at the left of the ticker. Replaces the older
+ * two-line instructional label so the bar has one bold call-to-action
+ * instead of competing gold blocks. */
+.wc-ticker-all {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0 1.25rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.14em;
+  font-size: 0.9rem;
+  text-transform: uppercase;
   color: var(--wc-black);
-  padding-right: 1rem;
+  background: var(--wc-gold);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  transition:
+    background 0.2s ease,
+    padding 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+  z-index: 2;
+  cursor: pointer;
+}
+/* Animated shine sweep: a diagonal white band passes across the button on
+ * hover to reinforce clickability beyond the static color shift. */
+.wc-ticker-all::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -75%;
+  width: 50%;
+  height: 200%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  transform: skewX(-20deg);
+  transition: left 0.55s ease;
+  pointer-events: none;
+}
+.wc-ticker-all:hover {
+  background: var(--wc-gold-bright);
+  padding: 0 1.9rem 0 1.25rem;
+  box-shadow:
+    inset 0 0 0 2px var(--wc-black),
+    0 0 22px rgba(232, 197, 71, 0.55);
+  transform: scale(1.02);
+}
+.wc-ticker-all:hover::before {
+  left: 125%;
+}
+.wc-ticker-all:active { transform: scale(0.98); }
+
+/* The arrow lives in its own span so we can independently animate it on
+ * hover (slide right + bigger). */
+.wc-ticker-all .arrow {
+  display: inline-block;
+  transition: transform 0.2s ease;
+}
+.wc-ticker-all:hover .arrow {
+  transform: translateX(4px) scale(1.2);
 }
 .wc-ticker-day {
   font-size: 0.75rem;
@@ -1783,13 +1818,90 @@ a:hover { color: var(--wc-gold-bright); }
   .wc-play-stat { min-width: 100px; padding: 0.5rem 0.85rem; }
 }
 
+/* ============ Footer (real one with sitemap) ============ */
+.wc-footer {
+  background: var(--wc-black);
+  border-top: 1px solid var(--wc-border);
+  padding: 3.5rem 1.5rem 1.5rem;
+  margin-top: 4rem;   /* breathing room above the footer on short pages */
+}
+.wc-footer-inner {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 3rem;
+  align-items: start;
+}
+.wc-footer-brand .wc-brand { font-size: 1.4rem; margin-bottom: 0.85rem; }
+.wc-footer-brand p {
+  color: var(--wc-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-width: 32ch;
+  margin: 0;
+}
+.wc-footer-cols {
+  display: contents; /* let each column join the parent grid */
+}
+.wc-footer-col h4 {
+  font-family: var(--font-display);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--wc-gold);
+  margin: 0 0 1rem;
+}
+.wc-footer-col ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+.wc-footer-col a {
+  color: var(--wc-white);
+  text-decoration: none;
+  font-size: 0.95rem;
+  transition: color 0.15s ease;
+}
+.wc-footer-col a:hover { color: var(--wc-gold-bright); }
+
+.wc-footer-meta {
+  max-width: 1100px;
+  margin: 2.5rem auto 0;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--wc-border);
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-display);
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  color: var(--wc-text-muted);
+  text-transform: uppercase;
+}
+
+@media (max-width: 768px) {
+  .wc-footer { padding: 2.5rem 1.25rem 1.25rem; margin-top: 3rem; }
+  .wc-footer-inner {
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  .wc-footer-brand { grid-column: 1 / -1; }
+}
+@media (max-width: 480px) {
+  .wc-footer-inner { grid-template-columns: 1fr; gap: 1.75rem; }
+  .wc-footer-meta { flex-direction: column; gap: 0.4rem; text-align: center; }
+}
+
 /* ============ Helpers ============ */
 .hidden { display: none !important; }
 
 @media (max-width: 768px) {
   .wc-versus { grid-template-columns: 1fr; }
   .wc-versus .vs-divider { font-size: 2.5rem; }
-  .wc-nav-links { gap: 1rem; font-size: 0.9rem; }
+  .wc-nav-links { gap: 1.4rem; font-size: 0.9rem; }
   .wc-hero-inner { padding: 0 1.5rem; }
   .wc-nav { padding: 1rem 1.5rem; }
 }
@@ -1817,9 +1929,7 @@ a:hover { color: var(--wc-gold-bright); }
   .wc-nav-links a  { padding: 0.2rem 0; }
 
   /* Ticker: smaller pills, smaller label */
-  .wc-ticker-label::before { font-size: 0.55rem; letter-spacing: 0.14em; }
-  .wc-ticker-label::after  { font-size: 0.7rem; }
-  .wc-ticker-label { padding: 0 0.7rem; }
+  .wc-ticker-all { padding: 0 0.85rem; font-size: 0.78rem; letter-spacing: 0.1em; }
   .wc-ticker-pill  { font-size: 0.85rem; padding: 0 0.85rem; gap: 0.4rem; }
   .wc-ticker-day   { font-size: 0.65rem; padding: 0.08rem 0.35rem; }
   .wc-ticker-time  { font-size: 0.65rem; margin-left: 0.3rem; }
@@ -1868,7 +1978,7 @@ a:hover { color: var(--wc-gold-bright); }
   }
   /* Hide ".COM" if it's ever re-added; trim to just the wordmark */
   .wc-brand-tld { display: none; }
-  .wc-nav-links { gap: 0.6rem; font-size: 0.7rem; letter-spacing: 0.1em; }
+  .wc-nav-links { gap: 0.9rem; font-size: 0.7rem; letter-spacing: 0.1em; }
   .wc-nav-links a::after { display: none; }
 
   /* Ticker: compress further */
@@ -1878,9 +1988,7 @@ a:hover { color: var(--wc-gold-bright); }
   .wc-ticker-time { display: none; }   /* save space on tiny screens */
   .wc-ticker-vs { display: none; }
   .wc-ticker-flag { font-size: 0.95rem; }
-  .wc-ticker-label::before { display: none; }  /* drop the "tap a match" hint */
-  .wc-ticker-label::after  { font-size: 0.6rem; letter-spacing: 0.06em; }
-  .wc-ticker-label { padding: 0 0.5rem; }
+  .wc-ticker-all { padding: 0 0.65rem; font-size: 0.65rem; letter-spacing: 0.08em; }
 
   /* Recompute room for the fixed bars (they got shorter) */
   :root {
@@ -2020,8 +2128,8 @@ a:hover { color: var(--wc-gold-bright); }
 }
 
 @media (max-width: 380px) {
-  /* Tiny phones: pull the nav tight. With only 4 links, no overflow risk. */
-  .wc-nav-links { font-size: 0.65rem; gap: 0.5rem; }
+  /* Tiny phones: tighten the nav links since they're now just 4 items. */
+  .wc-nav-links { font-size: 0.65rem; gap: 0.65rem; }
   .wc-brand { font-size: 0.95rem; }
   .wc-brand-mark { font-size: 0.85rem; padding: 0 0.3rem; }
 

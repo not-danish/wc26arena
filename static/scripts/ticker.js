@@ -133,17 +133,11 @@ async function loadTicker() {
             </a>`;
     }).join('');
 
-    // "All fixtures" tail pill so far-future matches (e.g. teams in groups
-    // K–L) are still reachable when their match falls off the marquee.
-    const allHtml = `
-        <a class="wc-ticker-pill wc-ticker-pill-all" href="/fixtures">
-            <span class="wc-ticker-day">All</span>
-            <span>View every fixture →</span>
-        </a>`;
-
     // Duplicate the pill list once so the marquee can loop without a visible
-    // gap when the first copy scrolls off-screen.
-    track.innerHTML = pillHtml + allHtml + pillHtml + allHtml;
+    // gap when the first copy scrolls off-screen. The "All Fixtures" entry
+    // point is now a fixed button to the left of the marquee, in the
+    // ticker.html template, so it isn't part of the scrolling track.
+    track.innerHTML = pillHtml + pillHtml;
 }
 
 loadTicker();
