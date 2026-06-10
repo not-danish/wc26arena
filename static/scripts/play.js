@@ -28,6 +28,8 @@
     let mystery = null;    // same shape
     let streak = 0;
     let busy = false;
+    let currentTab = 'today';   // 'today' | 'week' | 'all'
+    let lastSeenDay = todayKey(); // for periodic day-rollover detection
 
     // ---------- DOM helpers ----------
     const $streak = () => document.getElementById('wc_play_streak');
@@ -59,11 +61,22 @@
     }
 
     async function loadTopStreaks() {
+        const TAB_TO_URL = {
+            today: '/api/streaks/today',
+            week:  '/api/streaks/week',
+            all:   '/api/streaks/all_time',
+        };
+        const TAB_TO_EMPTY = {
+            today: 'No streaks yet today. Be the first.',
+            week:  'No streaks recorded this week yet.',
+            all:   'No streaks recorded yet.',
+        };
+        const url = TAB_TO_URL[currentTab] || TAB_TO_URL.today;
         try {
-            const rows = await fetch('/api/streaks/today?limit=10').then(r => r.json());
+            const rows = await fetch(`${url}?limit=10`).then(r => r.json());
             const ol = document.getElementById('wc_play_top');
             if (!rows.length) {
-                ol.innerHTML = '<li class="muted">No streaks yet today. Be the first.</li>';
+                ol.innerHTML = `<li class="muted">${TAB_TO_EMPTY[currentTab]}</li>`;
                 return;
             }
             ol.innerHTML = rows.map(r => `
@@ -251,6 +264,48 @@
         mystery = b;
         render();
     }
+
+    // ---------- Tab switching ----------
+    document.querySelectorAll('.wc-play-tabs button').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            if (btn.classList.contains('active')) return;
+            document.querySelectorAll('.wc-play-tabs button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            currentTab = btn.dataset.tab;
+            loadTopStreaks();
+        });
+    });
+
+    // ---------- Day rollover + auto-refresh ----------
+    // The HUD's "Best today" stays stale if the tab is left open across UTC
+    // midnight, because updateHud() only runs on user input. Periodically
+    // detect the rollover and reset the displayed value.
+    function checkDayRollover() {
+        const today = todayKey();
+        if (today !== lastSeenDay) {
+            lastSeenDay = today;
+            updateHud();
+            if (currentTab === 'today') loadTopStreaks();
+        }
+    }
+    setInterval(checkDayRollover, 60_000);
+
+    // When the user comes back to the tab, recheck immediately and refresh
+    // the visible leaderboard (might have moved while they were away).
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) {
+            checkDayRollover();
+            loadTopStreaks();
+        }
+    });
+    window.addEventListener('focus', () => {
+        checkDayRollover();
+        loadTopStreaks();
+    });
+
+    // Periodic leaderboard poll so live submissions from other players show up
+    // without requiring a tab focus event.
+    setInterval(loadTopStreaks, 60_000);
 
     // ---------- Init ----------
     updateHud();

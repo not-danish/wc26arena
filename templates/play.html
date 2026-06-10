@@ -24,7 +24,11 @@
 
     <div class="wc-play-footer">
         <div class="wc-play-leaderboard">
-            <h3>Today's best streaks</h3>
+            <div class="wc-play-tabs" role="tablist" aria-label="Streak leaderboard period">
+                <button type="button" data-tab="today" class="active" role="tab">Today</button>
+                <button type="button" data-tab="week" role="tab">This Week</button>
+                <button type="button" data-tab="all" role="tab">All Time</button>
+            </div>
             <ol id="wc_play_top"><li class="muted">Loading…</li></ol>
         </div>
     </div>

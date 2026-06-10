@@ -1758,13 +1758,36 @@ a:hover { color: var(--wc-gold-bright); }
   border: 1px solid var(--wc-border);
   background: var(--wc-charcoal);
 }
-.wc-play-leaderboard h3 {
+/* Tab row replacing the old h3 title. Three pill buttons, the active one
+ * filled in solid gold so the period being viewed is unambiguous. */
+.wc-play-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 0 0 1rem;
+  border-bottom: 1px solid var(--wc-border);
+  padding-bottom: 0.85rem;
+}
+.wc-play-tabs button {
+  flex: 1;
+  background: transparent;
+  border: 1px solid var(--wc-border);
+  color: var(--wc-text-muted);
   font-family: var(--font-display);
-  letter-spacing: 0.18em;
-  font-size: 0.95rem;
-  color: var(--wc-gold);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  margin: 0 0 0.85rem;
+  font-size: 0.72rem;
+  padding: 0.55rem 0.5rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+.wc-play-tabs button:hover {
+  color: var(--wc-gold);
+  border-color: var(--wc-gold);
+}
+.wc-play-tabs button.active {
+  background: var(--wc-gold);
+  color: var(--wc-black);
+  border-color: var(--wc-gold);
 }
 .wc-play-leaderboard ol {
   list-style: none;

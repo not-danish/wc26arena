@@ -7,7 +7,7 @@ import random
 import elo
 import time
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 load_dotenv()  # Load environment variables from .env file (no-op in production)
 
@@ -353,14 +353,54 @@ def submit_streak():
     return jsonify({"ok": True})
 
 
+def _flatten_streaks(bucket_dict):
+    """Flatten a dict of {date: {push_id: entry}} into a list of entries."""
+    rows = []
+    for v in (bucket_dict or {}).values():
+        if isinstance(v, dict):
+            rows.extend(x for x in v.values() if isinstance(x, dict))
+        elif isinstance(v, list):
+            rows.extend(x for x in v if isinstance(x, dict))
+    return rows
+
+
 @app.route('/api/streaks/today')
 def streaks_today():
-    """Top N streaks for today, descending."""
+    """Top N streaks for today (UTC), descending."""
     limit = max(1, min(50, int(request.args.get('limit', 10))))
     raw = db.reference(f'data/streaks/{_today_key()}').get() or {}
     if isinstance(raw, list):
         raw = {str(i): v for i, v in enumerate(raw) if v}
-    rows = list(raw.values())
+    rows = list(raw.values()) if isinstance(raw, dict) else []
+    rows.sort(key=lambda r: (-(r.get('streak') or 0), r.get('ts') or 0))
+    return jsonify(rows[:limit])
+
+
+@app.route('/api/streaks/week')
+def streaks_week():
+    """Top N streaks from the last 7 calendar days (UTC), rolling."""
+    limit = max(1, min(50, int(request.args.get('limit', 10))))
+    now = datetime.now(timezone.utc)
+    bucket = {}
+    for i in range(7):
+        date_key = (now - timedelta(days=i)).strftime('%Y-%m-%d')
+        day = db.reference(f'data/streaks/{date_key}').get() or {}
+        if isinstance(day, list):
+            day = {str(i): v for i, v in enumerate(day) if v}
+        bucket[date_key] = day
+    rows = _flatten_streaks(bucket)
+    rows.sort(key=lambda r: (-(r.get('streak') or 0), r.get('ts') or 0))
+    return jsonify(rows[:limit])
+
+
+@app.route('/api/streaks/all_time')
+def streaks_all_time():
+    """Top N streaks across the entire history."""
+    limit = max(1, min(50, int(request.args.get('limit', 10))))
+    raw = db.reference('data/streaks').get() or {}
+    if isinstance(raw, list):
+        raw = {str(i): v for i, v in enumerate(raw) if v}
+    rows = _flatten_streaks(raw)
     rows.sort(key=lambda r: (-(r.get('streak') or 0), r.get('ts') or 0))
     return jsonify(rows[:limit])
 
