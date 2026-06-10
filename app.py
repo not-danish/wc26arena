@@ -675,22 +675,33 @@ def update_data():
     if not winning_id or not losing_id or winning_elo is None or losing_elo is None:
         return jsonify({"error": "Invalid data"}), 400
 
-    new_win_snapshot, new_loss_snapshot = elo.calculate_elo(winning_elo, losing_elo)
-    win_delta = new_win_snapshot - winning_elo
-    loss_delta = new_loss_snapshot - losing_elo
+    win_ref = db.reference(f'data/players/{winning_id}/ELO')
+    loss_ref = db.reference(f'data/players/{losing_id}/ELO')
 
-    def apply_delta(delta):
-        def _txn(current):
-            # First-write case: record may exist without an ELO field.
-            base = current if isinstance(current, (int, float)) else 1400
-            return int(round(base + delta))
-        return _txn
+    # Idempotent ELO updates: each transaction reads BOTH the player's current
+    # ELO and the opponent's current ELO, recomputes the math from scratch,
+    # and writes the result. If the same request runs twice (Render free-tier
+    # proxy retries, client retries, etc.) the second run sees post-first-run
+    # state and produces a near-zero delta instead of compounding.
+    def winner_txn(current_win):
+        cw = current_win if isinstance(current_win, (int, float)) else 1400
+        opp = loss_ref.get()
+        cl = opp if isinstance(opp, (int, float)) else 1400
+        new_w, _ = elo.calculate_elo(cw, cl)
+        return new_w
+
+    def loser_txn(current_loss):
+        cl = current_loss if isinstance(current_loss, (int, float)) else 1400
+        # Use the just-updated winner ELO. The winner already wrote above, so
+        # this read returns the post-write value, giving symmetric math.
+        opp = win_ref.get()
+        cw = opp if isinstance(opp, (int, float)) else 1400
+        _, new_l = elo.calculate_elo(cw, cl)
+        return new_l
 
     try:
-        win_ref = db.reference(f'data/players/{winning_id}/ELO')
-        loss_ref = db.reference(f'data/players/{losing_id}/ELO')
-        final_win = win_ref.transaction(apply_delta(win_delta))
-        final_loss = loss_ref.transaction(apply_delta(loss_delta))
+        final_win = win_ref.transaction(winner_txn)
+        final_loss = loss_ref.transaction(loser_txn)
     except Exception as e:
         print(f"Vote transaction failed: {e}")
         return jsonify({"error": "Vote failed"}), 500
