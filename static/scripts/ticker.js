@@ -103,6 +103,47 @@ function dayLabel(dateIso, kickoffUtc) {
     } catch { return ''; }
 }
 
+function pillHtmlFor(fx) {
+    const status = fx.status || 'upcoming';
+    const day = dayLabel(fx.date, fx.kickoff_utc);
+    const time = fx.time || '';
+    const score = fx.score;
+
+    // Center-of-pill content depends on status:
+    //   live + score present → "1 - 0" with pulsing LIVE dot + minute
+    //   ft   + score present → "1 - 0" with FT label
+    //   else                 → "vs" + scheduled kickoff time
+    let centerHtml = `<span class="wc-ticker-vs">vs</span>`;
+    let dayHtml = `<span class="wc-ticker-day">${day}</span>`;
+    let trailingHtml = `<span class="wc-ticker-time">${time}</span>`;
+
+    if (status === 'live') {
+        const minute = (score && score.minute) ? score.minute : 'LIVE';
+        dayHtml = `<span class="wc-ticker-day wc-ticker-live"><span class="dot"></span>${minute}</span>`;
+        if (score && score.home_score !== null && score.home_score !== undefined) {
+            centerHtml = `<span class="wc-ticker-score">${score.home_score} <span class="dash">-</span> ${score.away_score}</span>`;
+        }
+        trailingHtml = '';
+    } else if (status === 'ft') {
+        dayHtml = `<span class="wc-ticker-day wc-ticker-ft">FT</span>`;
+        if (score && score.home_score !== null && score.home_score !== undefined) {
+            centerHtml = `<span class="wc-ticker-score">${score.home_score} <span class="dash">-</span> ${score.away_score}</span>`;
+        }
+        trailingHtml = '';
+    }
+
+    return `
+        <a class="wc-ticker-pill" data-id="${fx.id}" data-status="${status}" href="/rank?match=${encodeURIComponent(fx.id)}">
+            ${dayHtml}
+            <span class="wc-ticker-flag">${flagEmoji(fx.home)}</span>
+            <span class="wc-ticker-team">${shortCountry(fx.home)}</span>
+            ${centerHtml}
+            <span class="wc-ticker-team">${shortCountry(fx.away)}</span>
+            <span class="wc-ticker-flag">${flagEmoji(fx.away)}</span>
+            ${trailingHtml}
+        </a>`;
+}
+
 async function loadTicker() {
     const track = document.getElementById('wc_ticker_track');
     if (!track) return;
@@ -118,26 +159,14 @@ async function loadTicker() {
         return;
     }
 
-    const pillHtml = fixtures.map(fx => {
-        const day = dayLabel(fx.date, fx.kickoff_utc);
-        const time = fx.time || '';
-        return `
-            <a class="wc-ticker-pill" href="/rank?match=${encodeURIComponent(fx.id)}">
-                <span class="wc-ticker-day">${day}</span>
-                <span class="wc-ticker-flag">${flagEmoji(fx.home)}</span>
-                <span class="wc-ticker-team">${shortCountry(fx.home)}</span>
-                <span class="wc-ticker-vs">vs</span>
-                <span class="wc-ticker-team">${shortCountry(fx.away)}</span>
-                <span class="wc-ticker-flag">${flagEmoji(fx.away)}</span>
-                <span class="wc-ticker-time">${time}</span>
-            </a>`;
-    }).join('');
+    const pillHtml = fixtures.map(pillHtmlFor).join('');
 
     // Duplicate the pill list once so the marquee can loop without a visible
-    // gap when the first copy scrolls off-screen. The "All Fixtures" entry
-    // point is now a fixed button to the left of the marquee, in the
-    // ticker.html template, so it isn't part of the scrolling track.
+    // gap when the first copy scrolls off-screen.
     track.innerHTML = pillHtml + pillHtml;
 }
 
+// Re-fetch fixtures (with fresh status + scores) every minute so live scores
+// update in place without a page reload.
 loadTicker();
+setInterval(loadTicker, 60_000);

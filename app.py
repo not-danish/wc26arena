@@ -172,6 +172,13 @@ def _ensure_cache_thread():
             print(f"Initial cache prime failed: {e}")
         threading.Thread(target=update_cache, daemon=True,
                          name="cache-refresh").start()
+        # Live-score poller: prime once synchronously, then loop in background.
+        try:
+            _fetch_live_scores()
+        except Exception as e:
+            print(f"Initial live score prime failed: {e}")
+        threading.Thread(target=_live_scores_loop, daemon=True,
+                         name="live-scores").start()
         _cache_thread_started = True
 
 
@@ -256,35 +263,188 @@ def _load_fixtures():
 ALL_FIXTURES = _load_fixtures()
 
 
-def _upcoming_fixtures(limit=10):
-    """Fixtures whose kickoff is in the future, sorted by kickoff time.
+# ---------- Live scores (TheSportsDB + manual Firebase fallback) ----------
+# Two-source design because TheSportsDB has incomplete WC26 coverage:
+#   - LIVE_SCORES_AUTO: best-effort fetch from TheSportsDB (60s cycle).
+#   - data/scores/{match_id} in Firebase: manually entered, always wins
+#     over auto values when present (admin uses Firebase console or the
+#     /api/admin/score endpoint to update).
+# Merged at request time so the frontend just gets one combined dict.
+LIVE_SCORES_AUTO = {}
+LIVE_SCORES_LAST_FETCH = 0
+TSDB_WC_LEAGUE = os.getenv('TSDB_WC_LEAGUE_ID', '4480')
+ADMIN_SECRET = os.getenv('ADMIN_SECRET', '')  # blank = endpoint disabled
 
-    Falls back to upcoming-by-date if the precise UTC kickoff couldn't be
-    computed at scrape time (some Wikipedia rows omit the offset).
+
+def _normalize_team_name(name):
+    """TheSportsDB and Wikipedia disagree on a few team names. Normalize so
+    matchups can be matched across sources."""
+    if not name:
+        return ''
+    name = name.lower().strip()
+    aliases = {
+        'south korea': 'korea republic', 'korea republic': 'korea republic',
+        'united states': 'usa', 'usa': 'usa',
+        'iran': 'ir iran', 'ir iran': 'ir iran',
+        'czech republic': 'czechia', 'czechia': 'czechia',
+        'bosnia and herzegovina': 'bosnia herzegovina', 'bosnia herzegovina': 'bosnia herzegovina',
+        'ivory coast': "cote d'ivoire", "cote d'ivoire": "cote d'ivoire",
+        'dr congo': 'congo dr', 'congo dr': 'congo dr',
+        'cape verde': 'cape verde islands', 'cape verde islands': 'cape verde islands',
+    }
+    return aliases.get(name, name)
+
+
+def _fetch_live_scores():
+    """Poll TheSportsDB for today's WC events and update LIVE_SCORES_AUTO."""
+    global LIVE_SCORES_LAST_FETCH
+    import urllib.request, urllib.parse
+    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
+    url = (f"https://www.thesportsdb.com/api/v1/json/3/eventsday.php"
+           f"?d={today}&l={urllib.parse.quote(TSDB_WC_LEAGUE)}")
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except Exception as e:
+        print(f"Live score fetch failed: {e}")
+        return
+    events = (data or {}).get('events') or []
+    if not events:
+        # Yesterday's events sometimes leak into "today" — also try the next
+        # logical day. Skip silently if nothing.
+        return
+
+    # Build a lookup of our fixtures by normalized (home, away).
+    fx_by_pair = {}
+    for fx in ALL_FIXTURES:
+        key = (_normalize_team_name(fx.get('home')), _normalize_team_name(fx.get('away')))
+        fx_by_pair[key] = fx['id']
+
+    updated = 0
+    for ev in events:
+        home_raw = ev.get('strHomeTeam') or ''
+        away_raw = ev.get('strAwayTeam') or ''
+        key = (_normalize_team_name(home_raw), _normalize_team_name(away_raw))
+        fid = fx_by_pair.get(key)
+        if not fid:
+            # Loose substring match as a fallback.
+            for (h, a), candidate in fx_by_pair.items():
+                if (key[0] in h or h in key[0]) and (key[1] in a or a in key[1]):
+                    fid = candidate
+                    break
+        if not fid:
+            continue
+        try:
+            home_score = int(ev.get('intHomeScore')) if ev.get('intHomeScore') is not None else None
+            away_score = int(ev.get('intAwayScore')) if ev.get('intAwayScore') is not None else None
+        except (TypeError, ValueError):
+            home_score = away_score = None
+        LIVE_SCORES_AUTO[fid] = {
+            'home_score': home_score,
+            'away_score': away_score,
+            'status': (ev.get('strStatus') or '').strip(),  # 'Match Finished', 'Not Started', etc.
+            'minute': (ev.get('strProgress') or '').strip(),
+        }
+        updated += 1
+    LIVE_SCORES_LAST_FETCH = time.time()
+    if updated:
+        print(f"Live scores updated: {updated} fixture(s)")
+
+
+def _live_scores_loop():
+    while True:
+        try:
+            _fetch_live_scores()
+        except Exception as e:
+            print(f"Live score loop error: {e}")
+        time.sleep(60)
+
+
+def _merged_scores():
+    """Merge TheSportsDB auto-pulled scores with Firebase-stored manual ones.
+    Manual entries always win because they're explicitly authored by us."""
+    try:
+        manual = db.reference('data/scores').get() or {}
+        if isinstance(manual, list):
+            manual = {str(i): v for i, v in enumerate(manual) if v}
+    except Exception:
+        manual = {}
+    out = dict(LIVE_SCORES_AUTO)
+    for fid, val in (manual or {}).items():
+        if isinstance(val, dict):
+            out[fid] = val
+    return out
+
+
+# ---------- Fixtures with status + scores ----------
+# A match is "live" from kickoff until 130 minutes after (90 + halftime +
+# stoppage + buffer). After that, today's matches stay visible as 'ft' for
+# the rest of the calendar day so people can still vote during post-match.
+LIVE_WINDOW_MINUTES = 130
+
+
+def _enrich_fixture(fx, now, scores=None):
+    """Attach status ('upcoming'|'live'|'ft'|'past') and any cached score."""
+    fx = dict(fx)  # copy so we don't mutate the source
+    kickoff = None
+    raw = fx.get('kickoff_utc')
+    if raw:
+        try:
+            kickoff = datetime.strptime(raw, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
+        except ValueError:
+            kickoff = None
+    if kickoff is None:
+        # date-only fallback: treat as midnight UTC for ordering
+        try:
+            kickoff = datetime.strptime(fx.get('date', ''), '%Y-%m-%d').replace(tzinfo=timezone.utc)
+        except ValueError:
+            return None, None
+
+    delta_min = (now - kickoff).total_seconds() / 60.0
+    if delta_min < 0:
+        fx['status'] = 'upcoming'
+    elif delta_min < LIVE_WINDOW_MINUTES:
+        fx['status'] = 'live'
+    elif fx.get('date') == now.strftime('%Y-%m-%d'):
+        fx['status'] = 'ft'      # finished, still today
+    else:
+        fx['status'] = 'past'    # past day; usually we skip these
+
+    score = scores.get(fx['id']) if scores else None
+    if score:
+        fx['score'] = score
+        # If the score record marks the match as finished, trust it over the
+        # time-based heuristic (e.g. penalties can run long).
+        status_str = (score.get('status') or '').lower()
+        if 'finished' in status_str or 'ft' in status_str or status_str == 'match finished':
+            fx['status'] = 'ft'
+    return kickoff, fx
+
+
+def _upcoming_fixtures(limit=10):
+    """Returns fixtures that are LIVE, UPCOMING, or finished-today.
+
+    Order: live first (most interesting to viewers), then today's upcoming,
+    then future upcoming chronologically, then today's already-finished.
     """
     now = datetime.now(timezone.utc)
-    upcoming = []
+    scores = _merged_scores()
+    rows = []
     for fx in ALL_FIXTURES:
-        kickoff = fx.get('kickoff_utc')
-        if kickoff:
-            try:
-                dt = datetime.strptime(kickoff, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=timezone.utc)
-                if dt < now:
-                    continue
-                upcoming.append((dt, fx))
-                continue
-            except ValueError:
-                pass
-        # Date-only fallback.
-        date = fx.get('date', '')
-        try:
-            d = datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=timezone.utc)
-            if d >= now.replace(hour=0, minute=0, second=0, microsecond=0):
-                upcoming.append((d, fx))
-        except ValueError:
+        kickoff, enriched = _enrich_fixture(fx, now, scores)
+        if not enriched:
             continue
-    upcoming.sort(key=lambda x: x[0])
-    return [fx for _, fx in upcoming[:limit]]
+        if enriched['status'] == 'past':
+            continue
+        rows.append((kickoff, enriched))
+
+    def sort_key(item):
+        kickoff, fx = item
+        priority = {'live': 0, 'upcoming': 1, 'ft': 2}.get(fx['status'], 3)
+        return (priority, kickoff)
+
+    rows.sort(key=sort_key)
+    return [fx for _, fx in rows[:limit]]
 
 
 def _players_for_countries(countries):
@@ -470,7 +630,10 @@ def next_pair_api():
 
 @app.route('/api/fixtures')
 def fixtures_api():
-    """Upcoming fixtures. ?limit=all returns every remaining fixture."""
+    """Live + today's + upcoming fixtures with status and scores attached.
+
+    ?limit=all returns every remaining fixture (live/today/upcoming).
+    """
     raw = request.args.get('limit', '30')
     if raw == 'all':
         limit = len(ALL_FIXTURES) or 200
@@ -480,6 +643,55 @@ def fixtures_api():
         except ValueError:
             limit = 30
     return jsonify(_upcoming_fixtures(limit=limit))
+
+
+@app.route('/api/scores')
+def scores_api():
+    """Light-weight live scores snapshot for clients that want to poll just
+    the scores without re-fetching the entire fixture list. Returns the
+    merged TheSportsDB auto + Firebase manual map."""
+    return jsonify({
+        'scores': _merged_scores(),
+        'fetched_at': LIVE_SCORES_LAST_FETCH,
+    })
+
+
+@app.route('/api/admin/score', methods=['POST'])
+def admin_set_score():
+    """Manually set a match score. Required when TheSportsDB doesn't have
+    coverage. Auth: shared-secret env var ADMIN_SECRET, passed as
+    X-Admin-Secret header. Leave the env var blank to disable the endpoint
+    in production.
+
+    Body: {match_id, home_score, away_score, status?, minute?}
+        status: 'live' | 'ft' | 'upcoming' (defaults: kept from existing)
+        minute: any free-text label like "67'" or "HT" (optional)
+
+    Send {match_id, clear: true} to delete a score entry.
+    """
+    if not ADMIN_SECRET:
+        return jsonify({"error": "admin endpoint disabled"}), 403
+    if request.headers.get('X-Admin-Secret') != ADMIN_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    fid = data.get('match_id')
+    if not fid:
+        return jsonify({"error": "match_id required"}), 400
+    ref = db.reference(f'data/scores/{fid}')
+    if data.get('clear'):
+        ref.delete()
+        return jsonify({"ok": True, "cleared": fid})
+    try:
+        entry = {
+            'home_score': int(data.get('home_score') or 0),
+            'away_score': int(data.get('away_score') or 0),
+            'status':     (data.get('status') or '').strip(),
+            'minute':     (data.get('minute') or '').strip(),
+        }
+    except (TypeError, ValueError):
+        return jsonify({"error": "scores must be integers"}), 400
+    ref.set(entry)
+    return jsonify({"ok": True, "set": fid, "value": entry})
 
 
 @app.route('/api/fixture_players')

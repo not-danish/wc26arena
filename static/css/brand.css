@@ -345,6 +345,42 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-ticker-flag { font-size: 1.1rem; line-height: 1; }
 
+/* LIVE matches: pulsing red dot inside a deep-red badge to make the status
+ * unmistakable next to the muted upcoming pills. */
+.wc-ticker-day.wc-ticker-live {
+  background: #E31B23;
+  color: var(--wc-white);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.wc-ticker-day.wc-ticker-live .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--wc-white);
+  box-shadow: 0 0 8px rgba(255,255,255,0.8);
+  animation: wc-pulse 1.4s ease-in-out infinite;
+}
+@keyframes wc-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(0.85); }
+  50%      { opacity: 1;   transform: scale(1.15); }
+}
+/* Finished matches: muted "FT" badge. */
+.wc-ticker-day.wc-ticker-ft {
+  background: var(--wc-graphite);
+  color: var(--wc-text-muted);
+}
+.wc-ticker-score {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  color: var(--wc-gold-bright);
+  letter-spacing: 0.05em;
+  padding: 0 0.15rem;
+}
+.wc-ticker-score .dash { color: var(--wc-text-muted); margin: 0 0.1rem; }
+/* In the gold-pill hover state, the score stays readable. */
+.wc-ticker-pill:hover .wc-ticker-score { color: var(--wc-black); }
+
 /* Push page content below the fixed nav + ticker stack. */
 .wc-rank-page,
 .wc-leaderboard-page {
@@ -1437,6 +1473,49 @@ a:hover { color: var(--wc-gold-bright); }
   letter-spacing: 0.08em;
   font-size: 0.9rem;
   color: var(--wc-gold-bright);
+}
+.wc-fixture-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.12em;
+  font-size: 0.75rem;
+  padding: 0.2rem 0.45rem;
+  text-transform: uppercase;
+}
+.wc-fixture-status.live {
+  background: #E31B23;
+  color: var(--wc-white);
+}
+.wc-fixture-status.live .dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--wc-white);
+  box-shadow: 0 0 8px rgba(255,255,255,0.85);
+  animation: wc-pulse 1.4s ease-in-out infinite;
+}
+.wc-fixture-status.ft {
+  background: var(--wc-graphite);
+  color: var(--wc-text-muted);
+}
+.wc-fixture-score {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  color: var(--wc-gold-bright);
+  letter-spacing: 0.05em;
+  padding: 0 0.4rem;
+}
+.wc-fixture-score .dash { color: var(--wc-text-muted); margin: 0 0.15rem; }
+
+/* LIVE matches in the fixtures list get a subtle left-border highlight so
+ * they jump out of the schedule grid. */
+.wc-fixture-card.wc-fixture-live {
+  border-left: 3px solid #E31B23;
+  background: rgba(227, 27, 35, 0.06);
+}
+.wc-fixture-card.wc-fixture-ft {
+  opacity: 0.85;
 }
 .wc-fixture-teams {
   display: flex;

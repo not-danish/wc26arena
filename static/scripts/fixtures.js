@@ -46,16 +46,37 @@
         for (const [date, group] of byDate) {
             html.push(`<h3 class="wc-fixtures-date">${esc(dateLabel(date))}</h3>`);
             for (const fx of group) {
+                const status = fx.status || 'upcoming';
+                const sc = fx.score;
+                let timeCell = `<span class="wc-fixture-time">${esc(fx.time || '')}</span>`;
+                let centerCell = `<span class="vs">vs</span>`;
+                let cta = `Rank these squads →`;
+
+                if (status === 'live') {
+                    const minute = (sc && sc.minute) ? esc(sc.minute) : 'LIVE';
+                    timeCell = `<span class="wc-fixture-status live"><span class="dot"></span>${minute}</span>`;
+                    if (sc && sc.home_score !== null && sc.home_score !== undefined) {
+                        centerCell = `<span class="wc-fixture-score">${sc.home_score} <span class="dash">-</span> ${sc.away_score}</span>`;
+                    }
+                    cta = `Vote on players →`;
+                } else if (status === 'ft') {
+                    timeCell = `<span class="wc-fixture-status ft">FT</span>`;
+                    if (sc && sc.home_score !== null && sc.home_score !== undefined) {
+                        centerCell = `<span class="wc-fixture-score">${sc.home_score} <span class="dash">-</span> ${sc.away_score}</span>`;
+                    }
+                    cta = `Rate this match →`;
+                }
+
                 html.push(`
-                    <a class="wc-fixture-card" href="/rank?match=${encodeURIComponent(fx.id)}">
-                        <span class="wc-fixture-time">${esc(fx.time || '')}</span>
+                    <a class="wc-fixture-card wc-fixture-${status}" href="/rank?match=${encodeURIComponent(fx.id)}">
+                        ${timeCell}
                         <span class="wc-fixture-teams">
                             <span class="team">${esc(fx.home)}</span>
-                            <span class="vs">vs</span>
+                            ${centerCell}
                             <span class="team">${esc(fx.away)}</span>
                         </span>
                         <span class="wc-fixture-venue">${esc(fx.venue || '')}</span>
-                        <span class="wc-fixture-cta">Rank these squads →</span>
+                        <span class="wc-fixture-cta">${cta}</span>
                     </a>`);
             }
         }
@@ -75,7 +96,11 @@
                 '<div class="wc-loading">No upcoming fixtures.</div>';
             return;
         }
-        render('');
+        render(currentSearch());
+    }
+
+    function currentSearch() {
+        return document.getElementById('wc_fx_search')?.value || '';
     }
 
     document.getElementById('wc_fx_search')?.addEventListener('input', (e) => {
@@ -83,4 +108,6 @@
     });
 
     load();
+    // Refresh every 60s so LIVE scores update in place without a page reload.
+    setInterval(load, 60_000);
 })();
