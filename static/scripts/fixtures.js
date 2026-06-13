@@ -18,6 +18,31 @@
         });
     }
 
+    // Kickoff time rendered in the viewer's browser timezone. Falls back to
+    // the stadium-local fx.time string if kickoff_utc is missing.
+    function localTime(fx) {
+        if (!fx.kickoff_utc) return fx.time || '';
+        try {
+            return new Date(fx.kickoff_utc).toLocaleTimeString(undefined, {
+                hour: 'numeric', minute: '2-digit',
+            });
+        } catch { return fx.time || ''; }
+    }
+
+    // Returns the calendar date (YYYY-MM-DD) of kickoff in viewer's local TZ.
+    // Without this, a 11pm-PT match would still be grouped under the UTC
+    // date which is the next day for a US viewer.
+    function localDateKey(fx) {
+        if (!fx.kickoff_utc) return fx.date || '';
+        try {
+            const d = new Date(fx.kickoff_utc);
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        } catch { return fx.date || ''; }
+    }
+
     let allFixtures = [];
 
     function render(filter) {
@@ -34,12 +59,14 @@
             return;
         }
 
-        // Group fixtures by calendar date so the page reads as a schedule
-        // rather than an undifferentiated list.
+        // Group fixtures by local calendar date so the page reads as a
+        // schedule in the viewer's timezone (a 10pm-PT match isn't grouped
+        // under tomorrow's UTC date for a West-coast viewer).
         const byDate = new Map();
         for (const fx of matches) {
-            if (!byDate.has(fx.date)) byDate.set(fx.date, []);
-            byDate.get(fx.date).push(fx);
+            const key = localDateKey(fx);
+            if (!byDate.has(key)) byDate.set(key, []);
+            byDate.get(key).push(fx);
         }
 
         const html = [];
@@ -48,7 +75,7 @@
             for (const fx of group) {
                 const status = fx.status || 'upcoming';
                 const sc = fx.score;
-                let timeCell = `<span class="wc-fixture-time">${esc(fx.time || '')}</span>`;
+                let timeCell = `<span class="wc-fixture-time">${esc(localTime(fx))}</span>`;
                 let centerCell = `<span class="vs">vs</span>`;
                 let cta = `Rank these squads →`;
 

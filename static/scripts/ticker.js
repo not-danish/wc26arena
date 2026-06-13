@@ -103,10 +103,21 @@ function dayLabel(dateIso, kickoffUtc) {
     } catch { return ''; }
 }
 
+// Returns the kickoff time in the viewer's local timezone, e.g. "3:00 PM".
+// Falls back to the stadium-local fx.time string if kickoff_utc is missing.
+function localTime(fx) {
+    if (!fx.kickoff_utc) return fx.time || '';
+    try {
+        return new Date(fx.kickoff_utc).toLocaleTimeString(undefined, {
+            hour: 'numeric', minute: '2-digit',
+        });
+    } catch { return fx.time || ''; }
+}
+
 function pillHtmlFor(fx) {
     const status = fx.status || 'upcoming';
     const day = dayLabel(fx.date, fx.kickoff_utc);
-    const time = fx.time || '';
+    const time = localTime(fx);
     const score = fx.score;
 
     // Center-of-pill content depends on status:
