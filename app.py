@@ -316,57 +316,65 @@ def _normalize_team_name(name):
     return aliases.get(name, name)
 
 
-def _fetch_live_scores():
-    """Poll TheSportsDB for today's WC events and update LIVE_SCORES_AUTO."""
-    global LIVE_SCORES_LAST_FETCH
+def _fetch_events_for_day(day_str):
+    """Fetch TheSportsDB events for a single UTC day. Returns a list."""
     import urllib.request, urllib.parse
-    today = datetime.now(timezone.utc).strftime('%Y-%m-%d')
     url = (f"https://www.thesportsdb.com/api/v1/json/3/eventsday.php"
-           f"?d={today}&l={urllib.parse.quote(TSDB_WC_LEAGUE)}")
+           f"?d={day_str}&l={urllib.parse.quote(TSDB_WC_LEAGUE)}")
     try:
         with urllib.request.urlopen(url, timeout=10) as resp:
             data = json.loads(resp.read())
     except Exception as e:
-        print(f"Live score fetch failed: {e}")
-        return
-    events = (data or {}).get('events') or []
-    if not events:
-        # Yesterday's events sometimes leak into "today" — also try the next
-        # logical day. Skip silently if nothing.
-        return
+        print(f"Live score fetch failed for {day_str}: {e}")
+        return []
+    return (data or {}).get('events') or []
 
-    # Build a lookup of our fixtures by normalized (home, away).
+
+def _fetch_live_scores():
+    """Poll TheSportsDB for WC events over the last few days + the next two,
+    so recently-finished, currently-live, and just-upcoming matches all
+    populate LIVE_SCORES_AUTO. Run once per minute by the background thread.
+    """
+    global LIVE_SCORES_LAST_FETCH
+    now = datetime.now(timezone.utc)
+    # Window: 3 days back through 2 days forward.
+    days = [(now + timedelta(days=offset)).strftime('%Y-%m-%d')
+            for offset in range(-3, 3)]
+
+    # Build fixture lookup by normalized (home, away).
     fx_by_pair = {}
     for fx in ALL_FIXTURES:
         key = (_normalize_team_name(fx.get('home')), _normalize_team_name(fx.get('away')))
         fx_by_pair[key] = fx['id']
 
     updated = 0
-    for ev in events:
-        home_raw = ev.get('strHomeTeam') or ''
-        away_raw = ev.get('strAwayTeam') or ''
-        key = (_normalize_team_name(home_raw), _normalize_team_name(away_raw))
-        fid = fx_by_pair.get(key)
-        if not fid:
-            # Loose substring match as a fallback.
-            for (h, a), candidate in fx_by_pair.items():
-                if (key[0] in h or h in key[0]) and (key[1] in a or a in key[1]):
-                    fid = candidate
-                    break
-        if not fid:
-            continue
-        try:
-            home_score = int(ev.get('intHomeScore')) if ev.get('intHomeScore') is not None else None
-            away_score = int(ev.get('intAwayScore')) if ev.get('intAwayScore') is not None else None
-        except (TypeError, ValueError):
-            home_score = away_score = None
-        LIVE_SCORES_AUTO[fid] = {
-            'home_score': home_score,
-            'away_score': away_score,
-            'status': (ev.get('strStatus') or '').strip(),  # 'Match Finished', 'Not Started', etc.
-            'minute': (ev.get('strProgress') or '').strip(),
-        }
-        updated += 1
+    for day_str in days:
+        for ev in _fetch_events_for_day(day_str):
+            home_raw = ev.get('strHomeTeam') or ''
+            away_raw = ev.get('strAwayTeam') or ''
+            key = (_normalize_team_name(home_raw), _normalize_team_name(away_raw))
+            fid = fx_by_pair.get(key)
+            if not fid:
+                # Loose substring match as fallback.
+                for (h, a), candidate in fx_by_pair.items():
+                    if (key[0] in h or h in key[0]) and (key[1] in a or a in key[1]):
+                        fid = candidate
+                        break
+            if not fid:
+                continue
+            try:
+                home_score = int(ev.get('intHomeScore')) if ev.get('intHomeScore') is not None else None
+                away_score = int(ev.get('intAwayScore')) if ev.get('intAwayScore') is not None else None
+            except (TypeError, ValueError):
+                home_score = away_score = None
+            LIVE_SCORES_AUTO[fid] = {
+                'home_score': home_score,
+                'away_score': away_score,
+                'status': (ev.get('strStatus') or '').strip(),
+                'minute': (ev.get('strProgress') or '').strip(),
+            }
+            updated += 1
+
     LIVE_SCORES_LAST_FETCH = time.time()
     if updated:
         print(f"Live scores updated: {updated} fixture(s)")
@@ -426,10 +434,10 @@ def _enrich_fixture(fx, now, scores=None):
         fx['status'] = 'upcoming'
     elif delta_min < LIVE_WINDOW_MINUTES:
         fx['status'] = 'live'
-    elif delta_min < 60 * 48:    # finished within the last 48 hours
+    elif delta_min < 60 * 24 * 5:    # finished within the last 5 days
         fx['status'] = 'ft'
     else:
-        fx['status'] = 'past'    # older than 48h, hide
+        fx['status'] = 'past'    # older than 5 days, hide
 
     score = scores.get(fx['id']) if scores else None
     if score:
@@ -442,11 +450,14 @@ def _enrich_fixture(fx, now, scores=None):
     return kickoff, fx
 
 
-def _upcoming_fixtures(limit=10):
+def _upcoming_fixtures(limit=10, order='ticker'):
     """Returns fixtures that are LIVE, UPCOMING, or finished-today.
 
-    Order: live first (most interesting to viewers), then today's upcoming,
-    then future upcoming chronologically, then today's already-finished.
+    `order` controls sort:
+      - 'ticker' (default): live first, then recent FT, then today's upcoming,
+        then older FT, then future. Optimised for the limited marquee space.
+      - 'chrono': pure chronological by kickoff. Best for the fixtures page,
+        which reads top-to-bottom as a tournament schedule.
     """
     now = datetime.now(timezone.utc)
     scores = _merged_scores()
@@ -459,30 +470,26 @@ def _upcoming_fixtures(limit=10):
             continue
         rows.append((kickoff, enriched))
 
-    # Ordering matters because the ticker has a fixed limit. We want:
-    #   1. LIVE matches first (most urgent)
-    #   2. Recent results (FT within ~24h, sorted most recent first)
-    #   3. Today's still-upcoming matches
-    #   4. Future upcoming matches chronologically
-    #   5. Older FT matches (sorted most recent first) as a tail
-    today_str = now.strftime('%Y-%m-%d')
-    def sort_key(item):
-        kickoff, fx = item
-        status = fx['status']
-        is_today = fx.get('date') == today_str
-        delta_min = (now - kickoff).total_seconds() / 60.0
-        if status == 'live':
-            return (0, kickoff)
-        if status == 'ft' and delta_min < 60 * 24:
-            return (1, -kickoff.timestamp())     # most recent first
-        if status == 'upcoming' and is_today:
-            return (2, kickoff)
-        if status == 'upcoming':
-            return (3, kickoff)
-        # remaining: older FT within the 48h window
-        return (4, -kickoff.timestamp())
-
-    rows.sort(key=sort_key)
+    if order == 'chrono':
+        # Schedule view: oldest finished match at the top, future at the bottom.
+        rows.sort(key=lambda item: item[0])
+    else:
+        today_str = now.strftime('%Y-%m-%d')
+        def ticker_key(item):
+            kickoff, fx = item
+            status = fx['status']
+            is_today = fx.get('date') == today_str
+            delta_min = (now - kickoff).total_seconds() / 60.0
+            if status == 'live':
+                return (0, kickoff)
+            if status == 'ft' and delta_min < 60 * 48:
+                return (1, -kickoff.timestamp())
+            if status == 'upcoming' and is_today:
+                return (2, kickoff)
+            if status == 'ft':
+                return (3, -kickoff.timestamp())
+            return (4, kickoff)
+        rows.sort(key=ticker_key)
     return [fx for _, fx in rows[:limit]]
 
 
@@ -671,7 +678,10 @@ def next_pair_api():
 def fixtures_api():
     """Live + today's + upcoming fixtures with status and scores attached.
 
-    ?limit=all returns every remaining fixture (live/today/upcoming).
+    Query params:
+        limit: integer or 'all'
+        order: 'ticker' (default) for live/recent-first, 'chrono' for pure
+               chronological by kickoff (used by the /fixtures page)
     """
     raw = request.args.get('limit', '30')
     if raw == 'all':
@@ -681,7 +691,10 @@ def fixtures_api():
             limit = int(raw)
         except ValueError:
             limit = 30
-    return jsonify(_upcoming_fixtures(limit=limit))
+    order = request.args.get('order', 'ticker')
+    if order not in ('ticker', 'chrono'):
+        order = 'ticker'
+    return jsonify(_upcoming_fixtures(limit=limit, order=order))
 
 
 @app.route('/api/scores')

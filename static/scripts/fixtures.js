@@ -85,7 +85,7 @@
 
     async function load() {
         try {
-            allFixtures = await fetch('/api/fixtures?limit=all').then(r => r.json());
+            allFixtures = await fetch('/api/fixtures?limit=all&order=chrono').then(r => r.json());
         } catch (e) {
             document.getElementById('wc_fixtures_list').innerHTML =
                 '<div class="wc-loading">Failed to load fixtures.</div>';
