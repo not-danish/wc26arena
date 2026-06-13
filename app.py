@@ -459,10 +459,28 @@ def _upcoming_fixtures(limit=10):
             continue
         rows.append((kickoff, enriched))
 
+    # Ordering matters because the ticker has a fixed limit. We want:
+    #   1. LIVE matches first (most urgent)
+    #   2. Recent results (FT within ~24h, sorted most recent first)
+    #   3. Today's still-upcoming matches
+    #   4. Future upcoming matches chronologically
+    #   5. Older FT matches (sorted most recent first) as a tail
+    today_str = now.strftime('%Y-%m-%d')
     def sort_key(item):
         kickoff, fx = item
-        priority = {'live': 0, 'upcoming': 1, 'ft': 2}.get(fx['status'], 3)
-        return (priority, kickoff)
+        status = fx['status']
+        is_today = fx.get('date') == today_str
+        delta_min = (now - kickoff).total_seconds() / 60.0
+        if status == 'live':
+            return (0, kickoff)
+        if status == 'ft' and delta_min < 60 * 24:
+            return (1, -kickoff.timestamp())     # most recent first
+        if status == 'upcoming' and is_today:
+            return (2, kickoff)
+        if status == 'upcoming':
+            return (3, kickoff)
+        # remaining: older FT within the 48h window
+        return (4, -kickoff.timestamp())
 
     rows.sort(key=sort_key)
     return [fx for _, fx in rows[:limit]]
