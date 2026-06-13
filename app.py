@@ -7,6 +7,7 @@ import random
 import elo
 import time
 import threading
+import re
 from datetime import datetime, timezone, timedelta
 
 load_dotenv()  # Load environment variables from .env file (no-op in production)
@@ -272,25 +273,45 @@ ALL_FIXTURES = _load_fixtures()
 # Merged at request time so the frontend just gets one combined dict.
 LIVE_SCORES_AUTO = {}
 LIVE_SCORES_LAST_FETCH = 0
-TSDB_WC_LEAGUE = os.getenv('TSDB_WC_LEAGUE_ID', '4480')
+TSDB_WC_LEAGUE = os.getenv('TSDB_WC_LEAGUE_ID', '4429')  # TheSportsDB "FIFA World Cup"
 ADMIN_SECRET = os.getenv('ADMIN_SECRET', '')  # blank = endpoint disabled
 
 
 def _normalize_team_name(name):
-    """TheSportsDB and Wikipedia disagree on a few team names. Normalize so
-    matchups can be matched across sources."""
+    """Collapse Wikipedia / TheSportsDB / common variants to a single key.
+
+    Strips non-alphanumerics (so 'Bosnia-Herzegovina' == 'Bosnia and Herzegovina'
+    after alias resolution) and applies a curated alias map for nations whose
+    English names differ between data sources.
+    """
     if not name:
         return ''
     name = name.lower().strip()
+    # Replace separators and punctuation with single spaces so naming variants
+    # converge before we look up aliases.
+    name = re.sub(r"[-&/.,'’]", ' ', name)
+    name = re.sub(r'\s+', ' ', name).strip()
+
     aliases = {
-        'south korea': 'korea republic', 'korea republic': 'korea republic',
-        'united states': 'usa', 'usa': 'usa',
-        'iran': 'ir iran', 'ir iran': 'ir iran',
-        'czech republic': 'czechia', 'czechia': 'czechia',
-        'bosnia and herzegovina': 'bosnia herzegovina', 'bosnia herzegovina': 'bosnia herzegovina',
-        'ivory coast': "cote d'ivoire", "cote d'ivoire": "cote d'ivoire",
-        'dr congo': 'congo dr', 'congo dr': 'congo dr',
-        'cape verde': 'cape verde islands', 'cape verde islands': 'cape verde islands',
+        'south korea':             'korea',
+        'korea republic':          'korea',
+        'korea':                   'korea',
+        'united states':           'usa',
+        'usa':                     'usa',
+        'iran':                    'iran',
+        'ir iran':                 'iran',
+        'czech republic':          'czechia',
+        'czechia':                 'czechia',
+        'bosnia herzegovina':      'bosnia',
+        'bosnia and herzegovina':  'bosnia',
+        'ivory coast':             'ivory coast',
+        'cote d ivoire':           'ivory coast',
+        'cote divoire':            'ivory coast',
+        'dr congo':                'dr congo',
+        'congo dr':                'dr congo',
+        'congo democratic republic': 'dr congo',
+        'cape verde':              'cape verde',
+        'cape verde islands':      'cape verde',
     }
     return aliases.get(name, name)
 
@@ -405,10 +426,10 @@ def _enrich_fixture(fx, now, scores=None):
         fx['status'] = 'upcoming'
     elif delta_min < LIVE_WINDOW_MINUTES:
         fx['status'] = 'live'
-    elif fx.get('date') == now.strftime('%Y-%m-%d'):
-        fx['status'] = 'ft'      # finished, still today
+    elif delta_min < 60 * 48:    # finished within the last 48 hours
+        fx['status'] = 'ft'
     else:
-        fx['status'] = 'past'    # past day; usually we skip these
+        fx['status'] = 'past'    # older than 48h, hide
 
     score = scores.get(fx['id']) if scores else None
     if score:
