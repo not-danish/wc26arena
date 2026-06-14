@@ -224,8 +224,23 @@ a:hover { color: var(--wc-gold-bright); }
   border-left: 1px solid var(--wc-border);
   text-decoration: none;
   cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, padding 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, padding 0.2s ease,
+              transform 0.2s ease, box-shadow 0.2s ease;
 }
+/* Persistent gold underline so the pill reads as a clickable link even at
+   rest. Important for mobile users who never see the hover state. */
+.wc-ticker-pill::before {
+  content: '';
+  position: absolute;
+  left: 0.85rem;
+  right: 0.85rem;
+  bottom: 4px;
+  height: 1px;
+  background: var(--wc-gold);
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+.wc-ticker-pill:hover::before { opacity: 0; }
 .wc-ticker-pill::after {
   content: 'RANK →';
   position: absolute;
@@ -245,6 +260,10 @@ a:hover { color: var(--wc-gold-bright); }
   background: var(--wc-gold);
   color: var(--wc-black);
   padding-right: 4.5rem;
+  transform: translateY(-1px);
+  box-shadow: 0 0 18px rgba(232, 197, 71, 0.45),
+              inset 0 0 0 1px var(--wc-gold-bright);
+  z-index: 2;
 }
 .wc-ticker-pill:hover .wc-ticker-day,
 .wc-ticker-pill:hover .wc-ticker-vs,
