@@ -15,11 +15,21 @@
             <button class="reset" id="filter_reset">Reset</button>
         </div>
 
-        {% include "components/leaderboard_table.html" %}
+        <div class="wc-leaderboard-grid">
+            <div class="wc-leaderboard-main">
+                {% include "components/leaderboard_table.html" %}
+            </div>
+            <aside class="wc-leaderboard-side">
+                {% with variant = 'side' %}
+                    {% include "components/movers.html" %}
+                {% endwith %}
+            </aside>
+        </div>
     </div>
 </section>
 {% endblock %}
 
 {% block scripts %}
     <script src="{{ url_for('static', filename='scripts/leaderboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/movers.js') }}"></script>
 {% endblock %}

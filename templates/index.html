@@ -34,4 +34,12 @@
         </a>
     </div>
 </section>
+
+{% with variant = 'rail' %}
+    {% include "components/movers.html" %}
+{% endwith %}
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/movers.js') }}"></script>
 {% endblock %}

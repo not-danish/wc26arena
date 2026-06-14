@@ -1,0 +1,29 @@
+{# Today's biggest ELO gainers and losers.
+   Pass `variant="rail"` for the compact 3+3 home rail, or omit for the full
+   list version used on /leaderboard. #}
+{% set variant = variant | default('full') %}
+<section class="wc-movers wc-movers-{{ variant }}" data-variant="{{ variant }}" id="movers">
+    <div class="wc-movers-head">
+        <div>
+            <h2>Today's Movers</h2>
+            <span class="wc-movers-sub">Biggest ELO swings in the last 24h</span>
+        </div>
+        {% if variant == 'rail' %}
+        <a class="wc-movers-seeall" href="/leaderboard#movers">See all movers →</a>
+        {% endif %}
+    </div>
+    <div class="wc-movers-grid">
+        <div class="wc-movers-col" data-kind="gainers">
+            <h3 class="wc-movers-title up">▲ Risers</h3>
+            <div class="wc-movers-list" id="wc_movers_gainers_{{ variant }}">
+                <div class="wc-movers-loading">Loading…</div>
+            </div>
+        </div>
+        <div class="wc-movers-col" data-kind="losers">
+            <h3 class="wc-movers-title down">▼ Fallers</h3>
+            <div class="wc-movers-list" id="wc_movers_losers_{{ variant }}">
+                <div class="wc-movers-loading">Loading…</div>
+            </div>
+        </div>
+    </div>
+</section>

@@ -197,7 +197,7 @@ a:hover { color: var(--wc-gold-bright); }
   align-items: center;
   gap: 2.5rem;
   white-space: nowrap;
-  animation: wc-marquee 90s linear infinite;
+  animation: wc-marquee 150s linear infinite;
   will-change: transform;
 }
 .wc-ticker:hover .wc-ticker-track { animation-play-state: paused; }
@@ -2239,4 +2239,216 @@ a:hover { color: var(--wc-gold-bright); }
   .wc-card .wc-name { font-size: 1.4rem; }
 
   .wc-ticker-flag { font-size: 0.85rem; }
+}
+
+/* ---------------- Today's Movers (gainers / losers) ---------------- */
+
+.wc-movers {
+  max-width: 1100px;
+  margin: 2.5rem auto;
+  padding: 1.5rem 1.25rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  border-radius: 12px;
+}
+.wc-movers-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.25rem;
+  flex-wrap: wrap;
+}
+.wc-movers-head > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.wc-movers-head h2 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.75rem;
+  letter-spacing: 0.05em;
+  margin: 0;
+  color: var(--wc-white);
+}
+.wc-movers-sub {
+  color: var(--wc-text-muted);
+  font-size: 0.85rem;
+}
+
+.wc-movers-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+}
+.wc-movers-col { min-width: 0; }
+.wc-movers-title {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.08em;
+  font-size: 1.1rem;
+  margin: 0 0 0.65rem;
+  color: var(--wc-text-muted);
+}
+.wc-movers-title.up   { color: #4ade80; }
+.wc-movers-title.down { color: #f87171; }
+
+.wc-movers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+.wc-mover-row {
+  display: grid;
+  grid-template-columns: 36px 1fr auto auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.65rem;
+  background: var(--wc-graphite);
+  border-radius: 8px;
+  text-decoration: none;
+  color: var(--wc-white);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.wc-mover-row:hover {
+  background: #333;
+  color: var(--wc-white);
+  transform: translateX(2px);
+}
+.wc-mover-img {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  object-fit: cover;
+  background: var(--wc-black);
+}
+.wc-mover-img-blank { background: var(--wc-black); }
+.wc-mover-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.wc-mover-pname {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wc-mover-meta {
+  font-size: 0.7rem;
+  color: var(--wc-text-muted);
+  letter-spacing: 0.04em;
+}
+.wc-mover-delta {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.15rem;
+  letter-spacing: 0.04em;
+  min-width: 3.2ch;
+  text-align: right;
+}
+.wc-mover-delta.up   { color: #4ade80; }
+.wc-mover-delta.down { color: #f87171; }
+.wc-mover-elo {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  color: var(--wc-text-muted);
+  min-width: 3.5ch;
+  text-align: right;
+}
+
+.wc-movers-loading,
+.wc-movers-empty {
+  color: var(--wc-text-muted);
+  font-size: 0.85rem;
+  padding: 0.75rem 0.25rem;
+}
+
+/* Homepage rail variant: sits below the hero on the page background.
+   Tighter than the leaderboard version since it's only showing the top 3. */
+.wc-movers-rail {
+  margin: 0 auto 3rem;
+  padding: 1.25rem 1.1rem 1rem;
+  background: linear-gradient(180deg, rgba(26,26,26,0.95), rgba(20,20,20,0.95));
+  border-top: 2px solid var(--wc-gold);
+}
+.wc-movers-rail .wc-movers-head h2 { font-size: 1.4rem; }
+.wc-movers-rail .wc-movers-sub { font-size: 0.78rem; }
+.wc-movers-rail .wc-movers-grid { gap: 1rem; }
+.wc-movers-rail .wc-mover-row { padding: 0.4rem 0.55rem; }
+
+.wc-movers-seeall {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.08em;
+  font-size: 0.85rem;
+  color: var(--wc-gold);
+  text-decoration: none;
+  white-space: nowrap;
+  align-self: center;
+}
+.wc-movers-seeall:hover { color: var(--wc-gold-bright); }
+
+@media (max-width: 640px) {
+  .wc-movers { padding: 1rem 0.75rem; margin: 1.5rem 0.75rem; }
+  .wc-movers-grid { grid-template-columns: 1fr; gap: 1rem; }
+  .wc-movers-head h2 { font-size: 1.4rem; }
+  .wc-mover-row {
+    grid-template-columns: 32px 1fr auto auto;
+    gap: 0.5rem;
+    padding: 0.45rem 0.55rem;
+  }
+  .wc-mover-img { width: 32px; height: 32px; }
+  .wc-mover-pname { font-size: 0.9rem; }
+  .wc-mover-delta { font-size: 1rem; }
+  .wc-mover-elo { font-size: 0.9rem; }
+}
+
+/* ---------------- Leaderboard 2-column grid (table + movers sidebar) ---------------- */
+
+.wc-leaderboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 1.5rem;
+  align-items: start;
+}
+.wc-leaderboard-main { min-width: 0; }
+.wc-leaderboard-side { position: sticky; top: calc(var(--wc-nav-height) + var(--wc-ticker-height) + 1rem); }
+
+/* Sidebar variant of movers: single column, tighter rows, stacked sections. */
+.wc-movers-side {
+  margin: 0;
+  padding: 1rem 0.85rem;
+}
+.wc-movers-side .wc-movers-head { margin-bottom: 0.85rem; }
+.wc-movers-side .wc-movers-head h2 { font-size: 1.25rem; }
+.wc-movers-side .wc-movers-sub { font-size: 0.7rem; }
+.wc-movers-side .wc-movers-grid {
+  grid-template-columns: 1fr;
+  gap: 1rem;
+}
+.wc-movers-side .wc-movers-title { font-size: 1rem; margin-bottom: 0.4rem; }
+.wc-movers-side .wc-mover-row {
+  grid-template-columns: 30px 1fr auto auto;
+  gap: 0.5rem;
+  padding: 0.4rem 0.5rem;
+}
+.wc-movers-side .wc-mover-img { width: 30px; height: 30px; }
+.wc-movers-side .wc-mover-pname { font-size: 0.85rem; }
+.wc-movers-side .wc-mover-meta { font-size: 0.65rem; }
+.wc-movers-side .wc-mover-delta { font-size: 1rem; min-width: 2.8ch; }
+.wc-movers-side .wc-mover-elo { font-size: 0.85rem; min-width: 3ch; }
+
+/* Below ~960px the sidebar drops under the table, full-width. */
+@media (max-width: 960px) {
+  .wc-leaderboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .wc-leaderboard-side {
+    position: static;
+  }
+  /* When dropped below, let it use the two-column gainer/faller layout for
+     better use of the wide space. */
+  .wc-movers-side .wc-movers-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+@media (max-width: 640px) {
+  .wc-movers-side .wc-movers-grid { grid-template-columns: 1fr; }
 }

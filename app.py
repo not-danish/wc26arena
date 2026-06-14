@@ -854,6 +854,75 @@ def filters_api():
     return jsonify({"countries": countries, "groups": groups, "positions": positions})
 
 
+@app.route('/api/movers')
+def movers_api():
+    """Today's biggest ELO gainers and losers (last 24h rolling).
+
+    For each player with elo_history, compare current ELO to the value most
+    recently sampled at-or-before the 24h cutoff. Players with no pre-cutoff
+    sample (i.e. their first vote happened within the window) are skipped —
+    otherwise brand-new players dominate the list with their full starting-
+    ELO swing.
+    """
+    limit = int(request.args.get('limit', 10))
+    window_sec = int(request.args.get('window', 24 * 3600))
+    cutoff = int(time.time()) - window_sec
+
+    history_root = db.reference('data/elo_history').get() or {}
+    if isinstance(history_root, list):
+        history_root = {str(i): v for i, v in enumerate(history_root) if v}
+
+    players = db.reference('data/players').get() or {}
+    if isinstance(players, list):
+        players = {str(i): v for i, v in enumerate(players) if v}
+
+    movers = []
+    for pid, hist in history_root.items():
+        if not hist:
+            continue
+        if isinstance(hist, list):
+            hist = {str(i): v for i, v in enumerate(hist) if v is not None}
+        try:
+            items = sorted(((int(ts), float(v)) for ts, v in hist.items()), key=lambda x: x[0])
+        except (TypeError, ValueError):
+            continue
+        if not items:
+            continue
+
+        baseline = None
+        for ts, v in items:
+            if ts <= cutoff:
+                baseline = v
+            else:
+                break
+        if baseline is None:
+            continue
+
+        current = items[-1][1]
+        delta = current - baseline
+        if abs(delta) < 0.5:
+            continue
+
+        rec = players.get(pid) or {}
+        if not rec:
+            continue
+        movers.append({
+            "id": pid,
+            "name": rec.get('player_name') or rec.get('name'),
+            "country": rec.get('country'),
+            "position": rec.get('position'),
+            "img": rec.get('image_url') or rec.get('img'),
+            "ELO": rec.get('ELO'),
+            "delta": round(delta, 1),
+        })
+
+    movers.sort(key=lambda m: m['delta'], reverse=True)
+    gainers = movers[:limit]
+    losers = sorted(movers, key=lambda m: m['delta'])[:limit]
+
+    return jsonify({"gainers": gainers, "losers": losers, "window_hours": window_sec // 3600})
+
+
 @app.route('/api/player/<player_id>')
 def player_api(player_id):
     """Full profile data for a single player: record, history, rank, W/L."""

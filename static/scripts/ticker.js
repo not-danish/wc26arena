@@ -91,6 +91,10 @@ function shortCountry(c) {
     return FIFA_CODES[c] || c.slice(0, 3).toUpperCase();
 }
 
+// Expose the FIFA code map so other small scripts (movers.js, fixtures.js)
+// can reuse it without duplicating the table.
+window.WC_FIFA_CODES = FIFA_CODES;
+
 function dayLabel(dateIso, kickoffUtc) {
     try {
         const d = kickoffUtc ? new Date(kickoffUtc) : new Date(dateIso + 'T12:00:00Z');
