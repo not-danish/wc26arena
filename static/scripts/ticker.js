@@ -156,6 +156,7 @@ function pillHtmlFor(fx) {
             <span class="wc-ticker-team">${shortCountry(fx.away)}</span>
             <span class="wc-ticker-flag">${flagEmoji(fx.away)}</span>
             ${trailingHtml}
+            <span class="wc-ticker-cta">RATE</span>
         </a>`;
 }
 
