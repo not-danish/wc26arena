@@ -215,7 +215,7 @@ a:hover { color: var(--wc-gold-bright); }
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0 1.25rem 0 1rem;
+  padding: 0 3.6rem 0 1rem;
   height: 100%;
   font-family: var(--font-display);
   letter-spacing: 0.08em;
@@ -227,39 +227,31 @@ a:hover { color: var(--wc-gold-bright); }
   transition: background 0.2s ease, color 0.2s ease, padding 0.2s ease,
               transform 0.2s ease, box-shadow 0.2s ease;
 }
-/* Persistent gold underline so the pill reads as a clickable link even at
-   rest. Important for mobile users who never see the hover state. */
-.wc-ticker-pill::before {
-  content: '';
-  position: absolute;
-  left: 0.85rem;
-  right: 0.85rem;
-  bottom: 4px;
-  height: 1px;
-  background: var(--wc-gold);
-  opacity: 0.55;
-  transition: opacity 0.2s ease;
-}
-.wc-ticker-pill:hover::before { opacity: 0; }
 .wc-ticker-pill::after {
-  content: 'RANK →';
+  content: 'RATE →';
   position: absolute;
-  right: 0.75rem;
+  right: 0.55rem;
   top: 50%;
-  transform: translate(8px, -50%);
-  opacity: 0;
-  font-size: 0.7rem;
-  letter-spacing: 0.15em;
+  transform: translateY(-50%);
+  opacity: 1;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
   color: var(--wc-black);
   background: var(--wc-gold);
-  padding: 0.18rem 0.5rem;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  padding: 0.22rem 0.5rem;
+  border-radius: 3px;
+  transition: background 0.2s ease, box-shadow 0.2s ease;
   pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.25);
+}
+.wc-ticker-pill:hover::after {
+  background: var(--wc-white);
+  box-shadow: 0 0 0 1px var(--wc-black);
 }
 .wc-ticker-pill:hover {
   background: var(--wc-gold);
   color: var(--wc-black);
-  padding-right: 4.5rem;
   transform: translateY(-1px);
   box-shadow: 0 0 18px rgba(232, 197, 71, 0.45),
               inset 0 0 0 1px var(--wc-gold-bright);
@@ -270,10 +262,6 @@ a:hover { color: var(--wc-gold-bright); }
 .wc-ticker-pill:hover .wc-ticker-time {
   color: var(--wc-black);
   background: rgba(0,0,0,0.1);
-}
-.wc-ticker-pill:hover::after {
-  opacity: 1;
-  transform: translate(0, -50%);
 }
 /* Single solid-gold anchor at the left of the ticker. Replaces the older
  * two-line instructional label so the bar has one bold call-to-action
@@ -2051,7 +2039,8 @@ a:hover { color: var(--wc-gold-bright); }
 
   /* Ticker: smaller pills, smaller label */
   .wc-ticker-all { padding: 0 0.85rem; font-size: 0.78rem; letter-spacing: 0.1em; }
-  .wc-ticker-pill  { font-size: 0.85rem; padding: 0 0.85rem; gap: 0.4rem; }
+  .wc-ticker-pill  { font-size: 0.85rem; padding: 0 3.1rem 0 0.85rem; gap: 0.4rem; }
+  .wc-ticker-pill::after { font-size: 0.6rem; padding: 0.18rem 0.42rem; right: 0.45rem; }
   .wc-ticker-day   { font-size: 0.65rem; padding: 0.08rem 0.35rem; }
   .wc-ticker-time  { font-size: 0.65rem; margin-left: 0.3rem; }
 
@@ -2104,7 +2093,8 @@ a:hover { color: var(--wc-gold-bright); }
 
   /* Ticker: compress further */
   .wc-ticker { height: 38px; }
-  .wc-ticker-pill { font-size: 0.75rem; padding: 0 0.7rem; gap: 0.3rem; }
+  .wc-ticker-pill { font-size: 0.75rem; padding: 0 2.8rem 0 0.7rem; gap: 0.3rem; }
+  .wc-ticker-pill::after { font-size: 0.55rem; padding: 0.16rem 0.38rem; right: 0.35rem; letter-spacing: 0.08em; }
   .wc-ticker-day { font-size: 0.6rem; }
   .wc-ticker-time { display: none; }   /* save space on tiny screens */
   .wc-ticker-vs { display: none; }
