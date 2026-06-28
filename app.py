@@ -728,6 +728,19 @@ def _resolve_bracket_placeholder(label, bracket_results, group_winners=None):
     return label
 
 
+_PLACEHOLDER_RE = re.compile(
+    r'^([12][A-L]|W\s+[A-Z0-9-]+|L\s+[A-Z0-9-]+|Best\s+3rd.*)$',
+    re.IGNORECASE,
+)
+
+def _is_placeholder_label(s):
+    """True if a team field still holds an unresolved bracket placeholder
+    like '1A', '2B', 'W R32-01', 'L SF-02', 'Best 3rd …'. Real country names
+    return False even if they're short (e.g. 'USA' isn't in the bracket
+    placeholder format)."""
+    return bool(s and _PLACEHOLDER_RE.match(s.strip()))
+
+
 def _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores):
     """Apply bracket placeholder resolution then run the usual enrichment."""
     if fx.get('stage') and fx['stage'] != 'group':
@@ -736,7 +749,12 @@ def _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores):
         fx['away_raw'] = fx.get('away')
         fx['home'] = _resolve_bracket_placeholder(fx['home'], bracket_results, group_winners)
         fx['away'] = _resolve_bracket_placeholder(fx['away'], bracket_results, group_winners)
-        fx['placeholder'] = (fx['home'] == fx['home_raw'] or fx['away'] == fx['away_raw'])
+        # A match is "placeholder" only if either slot still LOOKS like an
+        # unresolved bracket position. Real country names are not placeholders
+        # even when home_raw == home (i.e. no substitution was needed).
+        fx['placeholder'] = (
+            _is_placeholder_label(fx['home']) or _is_placeholder_label(fx['away'])
+        )
     kickoff, enriched = _enrich_fixture(fx, now, scores)
     return enriched
 
@@ -831,12 +849,7 @@ def survivors_api():
         if not enriched:
             continue
         for team in (enriched.get('home'), enriched.get('away')):
-            if not team:
-                continue
-            # Placeholder formats: "1A"/"2B", "Best 3rd …", "W R32-01", "L SF-02"
-            if (len(team) <= 3
-                    or team.startswith(('W ', 'L '))
-                    or team.lower().startswith('best 3')):
+            if not team or _is_placeholder_label(team):
                 continue
             cur = reached_stage.get(team)
             if cur is None or stage_order.index(stage) > stage_order.index(cur):
