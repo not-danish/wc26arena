@@ -79,6 +79,22 @@ async function initFilters() {
     opts.countries.forEach(c => ctry.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`));
     opts.positions.forEach(p => pos.insertAdjacentHTML('beforeend', `<option value="${p}">${p}</option>`));
 
+    // Honor ?country=, ?group=, ?position= so links from elsewhere on the
+    // site (Survivors page, ticker, etc.) land on a pre-filtered view.
+    const params = new URLSearchParams(window.location.search);
+    const initial = {
+        filter_group:    params.get('group')    || '',
+        filter_country:  params.get('country')  || '',
+        filter_position: params.get('position') || '',
+    };
+    for (const [id, val] of Object.entries(initial)) {
+        if (!val) continue;
+        const el = document.getElementById(id);
+        // Only set if the option actually exists, otherwise the dropdown stays
+        // on its "All" default and we don't end up filtering to nothing.
+        if (el && [...el.options].some(o => o.value === val)) el.value = val;
+    }
+
     for (const id of ['filter_group','filter_country','filter_position']) {
         document.getElementById(id).addEventListener('change', loadLeaderboard);
     }
@@ -86,6 +102,11 @@ async function initFilters() {
         grp.value = ''; ctry.value = ''; pos.value = '';
         loadLeaderboard();
     });
+
+    // Re-fetch with the URL-derived filters now that dropdowns are populated.
+    if (initial.filter_group || initial.filter_country || initial.filter_position) {
+        loadLeaderboard();
+    }
 }
 
 initFilters();

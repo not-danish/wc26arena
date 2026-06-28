@@ -759,6 +759,64 @@ def _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores):
     return enriched
 
 
+def _compute_eliminated_teams(now=None):
+    """Single source of truth for which national teams are out.
+
+    A team is eliminated if either:
+      - it lost a finished knockout match, OR
+      - it did NOT make the Round of 32 even though it was in the tournament
+        (i.e. it's in COUNTRY_GROUP but absent from the confirmed R32 lineup).
+
+    The R32 check only kicks in once the R32 lineup is actually known.
+    """
+    now = now or datetime.now(timezone.utc)
+    try:
+        bracket_results = db.reference('data/bracket_results').get() or {}
+    except Exception:
+        bracket_results = {}
+    if isinstance(bracket_results, list):
+        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
+    try:
+        group_winners = db.reference('data/group_winners').get() or {}
+    except Exception:
+        group_winners = {}
+    if isinstance(group_winners, list):
+        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+
+    scores = _merged_scores()
+    eliminated = set()
+    r32_participants = set()
+
+    for fx in ALL_FIXTURES:
+        stage = fx.get('stage')
+        if stage in (None, 'group'):
+            continue
+        enriched = _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores)
+        if not enriched:
+            continue
+        if stage == 'r32':
+            for team in (enriched.get('home'), enriched.get('away')):
+                if team and not _is_placeholder_label(team):
+                    r32_participants.add(team)
+        if enriched.get('status') != 'ft':
+            continue
+        sc = enriched.get('score') or {}
+        hs, as_ = sc.get('home_score'), sc.get('away_score')
+        if hs is None or as_ is None:
+            continue
+        if hs > as_:
+            eliminated.add(enriched.get('away'))
+        elif as_ > hs:
+            eliminated.add(enriched.get('home'))
+
+    if r32_participants:
+        for team in COUNTRY_GROUP:
+            if team not in r32_participants:
+                eliminated.add(team)
+
+    return eliminated
+
+
 @app.route('/api/bracket')
 def bracket_api():
     """Return the full knockout bracket with placeholders resolved.
@@ -794,21 +852,7 @@ def bracket_api():
     for stage in rounds:
         rounds[stage].sort(key=lambda f: f.get('kickoff_utc') or '')
 
-    # Compute alive/eliminated teams (anyone who lost a knockout match)
-    eliminated = set()
-    for stage, matches in rounds.items():
-        for m in matches:
-            if m.get('status') != 'ft':
-                continue
-            sc = m.get('score') or {}
-            hs, as_ = sc.get('home_score'), sc.get('away_score')
-            if hs is None or as_ is None:
-                continue
-            if hs > as_:
-                eliminated.add(m['away'])
-            elif as_ > hs:
-                eliminated.add(m['home'])
-
+    eliminated = _compute_eliminated_teams(now)
     return jsonify({
         'rounds': rounds,
         'eliminated': sorted(eliminated),
@@ -840,6 +884,7 @@ def survivors_api():
     stage_order = ['group', 'r32', 'r16', 'qf', 'sf', '3p', 'final']
     exit_stage = {}     # team -> stage they were eliminated at
     reached_stage = {}  # team -> deepest stage they appeared in
+    r32_participants = set()  # teams that made the Round of 32
 
     for fx in ALL_FIXTURES:
         stage = fx.get('stage')
@@ -854,6 +899,8 @@ def survivors_api():
             cur = reached_stage.get(team)
             if cur is None or stage_order.index(stage) > stage_order.index(cur):
                 reached_stage[team] = stage
+            if stage == 'r32':
+                r32_participants.add(team)
         if enriched.get('status') != 'ft':
             continue
         sc = enriched.get('score') or {}
@@ -863,6 +910,16 @@ def survivors_api():
         loser = enriched['away'] if hs > as_ else enriched['home'] if as_ > hs else None
         if loser and loser not in exit_stage:
             exit_stage[loser] = stage
+
+    # Group-stage exits: any team in COUNTRY_GROUP that did NOT make the R32
+    # is eliminated at the group stage. This catches both the 4th-place teams
+    # and the 4 worst 3rd-place teams that didn't advance.
+    # Only apply once the R32 lineup is actually known, otherwise we'd flag
+    # everyone as eliminated before group stage even finishes.
+    if r32_participants:
+        for team in COUNTRY_GROUP:
+            if team not in r32_participants and team not in exit_stage:
+                exit_stage[team] = 'group'
 
     # Every team in COUNTRY_GROUP plus any team we've seen in a knockout.
     all_teams = set(COUNTRY_GROUP.keys()) | set(reached_stage.keys()) | set(exit_stage.keys())
@@ -957,39 +1014,7 @@ def best_xi_api():
     the tournament (has not lost a knockout match).
     """
     alive_only = request.args.get('alive') in ('1', 'true', 'yes')
-
-    eliminated = set()
-    if alive_only:
-        try:
-            bracket_results = db.reference('data/bracket_results').get() or {}
-        except Exception:
-            bracket_results = {}
-        if isinstance(bracket_results, list):
-            bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
-        try:
-            group_winners = db.reference('data/group_winners').get() or {}
-        except Exception:
-            group_winners = {}
-        if isinstance(group_winners, list):
-            group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
-
-        now = datetime.now(timezone.utc)
-        scores = _merged_scores()
-        for fx in ALL_FIXTURES:
-            stage = fx.get('stage')
-            if stage in (None, 'group'):
-                continue
-            enriched = _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores)
-            if not enriched or enriched.get('status') != 'ft':
-                continue
-            sc = enriched.get('score') or {}
-            hs, as_ = sc.get('home_score'), sc.get('away_score')
-            if hs is None or as_ is None:
-                continue
-            if hs > as_:
-                eliminated.add(enriched.get('away'))
-            elif as_ > hs:
-                eliminated.add(enriched.get('home'))
+    eliminated = _compute_eliminated_teams() if alive_only else set()
 
     raw = db.reference('data/players').get() or {}
     if isinstance(raw, list):
