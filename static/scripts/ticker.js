@@ -94,6 +94,7 @@ function shortCountry(c) {
 // Expose the FIFA code map so other small scripts (movers.js, fixtures.js)
 // can reuse it without duplicating the table.
 window.WC_FIFA_CODES = FIFA_CODES;
+window.WC_FLAG_EMOJI = flagEmoji;
 
 function dayLabel(dateIso, kickoffUtc) {
     try {

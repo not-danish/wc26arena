@@ -44,15 +44,29 @@
     }
 
     let allFixtures = [];
+    let stageFilter = 'all';
+
+    const STAGE_LABELS = {
+        group: 'Group Stage', r32: 'Round of 32', r16: 'Round of 16',
+        qf: 'Quarterfinals', sf: 'Semifinals', '3p': 'Third-Place Playoff', final: 'FINAL',
+    };
+    const KNOCKOUT_STAGES = new Set(['r32', 'r16', 'qf', 'sf', '3p', 'final']);
+
+    function stageMatches(fx) {
+        if (stageFilter === 'all') return true;
+        if (stageFilter === 'ko') return KNOCKOUT_STAGES.has(fx.stage);
+        return fx.stage === stageFilter;
+    }
 
     function render(filter) {
         const container = document.getElementById('wc_fixtures_list');
         const q = (filter || '').trim().toLowerCase();
 
-        const matches = q
-            ? allFixtures.filter(fx =>
-                fx.home.toLowerCase().includes(q) || fx.away.toLowerCase().includes(q))
-            : allFixtures;
+        let matches = allFixtures.filter(stageMatches);
+        if (q) {
+            matches = matches.filter(fx =>
+                fx.home.toLowerCase().includes(q) || fx.away.toLowerCase().includes(q));
+        }
 
         if (matches.length === 0) {
             container.innerHTML = `<div class="wc-loading">No fixtures match "${esc(q)}".</div>`;
@@ -94,8 +108,15 @@
                     cta = `Rate this match →`;
                 }
 
+                const isKo = KNOCKOUT_STAGES.has(fx.stage);
+                const stageBadge = isKo
+                    ? `<span class="wc-fixture-stage stage-${esc(fx.stage)}">${esc(STAGE_LABELS[fx.stage] || fx.stage)}</span>`
+                    : '';
+                const koClass = isKo ? 'wc-fixture-knockout' : '';
+
                 html.push(`
-                    <a class="wc-fixture-card wc-fixture-${status}" href="/rank?match=${encodeURIComponent(fx.id)}">
+                    <a class="wc-fixture-card wc-fixture-${status} ${koClass}" href="/rank?match=${encodeURIComponent(fx.id)}">
+                        ${stageBadge}
                         ${timeCell}
                         <span class="wc-fixture-teams">
                             <span class="team">${esc(fx.home)}</span>
@@ -132,6 +153,16 @@
 
     document.getElementById('wc_fx_search')?.addEventListener('input', (e) => {
         render(e.target.value);
+    });
+
+    document.querySelectorAll('#wc_fx_stage_filter .wc-stage-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('#wc_fx_stage_filter .wc-stage-pill')
+                .forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            stageFilter = btn.dataset.stage || 'all';
+            render(currentSearch());
+        });
     });
 
     load();

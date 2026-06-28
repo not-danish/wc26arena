@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+
+{% block title %}Knockout Bracket · wc26arena.com{% endblock %}
+
+{% block header_content %}
+<section class="wc-bracket-page">
+    <div class="wc-bracket-heading animate__animated animate__fadeInDown">
+        <span class="wc-bracket-eyebrow">WIN OR GO HOME</span>
+        <h1>The Bracket</h1>
+        <p>Every match. Every elimination. One trophy.</p>
+    </div>
+
+    <div class="wc-bracket-meta">
+        <div class="wc-bracket-meta-stat">
+            <span class="wc-bracket-meta-num" id="wc_br_alive">—</span>
+            <span class="wc-bracket-meta-label">Teams alive</span>
+        </div>
+        <div class="wc-bracket-meta-stat">
+            <span class="wc-bracket-meta-num" id="wc_br_round">—</span>
+            <span class="wc-bracket-meta-label">Current round</span>
+        </div>
+        <div class="wc-bracket-meta-stat">
+            <span class="wc-bracket-meta-num" id="wc_br_next">—</span>
+            <span class="wc-bracket-meta-label">Next match</span>
+        </div>
+    </div>
+
+    <div class="wc-bracket-scroller">
+        <div id="wc_bracket_tree" class="wc-bracket-tree">
+            <div class="wc-loading">Loading bracket…</div>
+        </div>
+    </div>
+
+    <div class="wc-bracket-legend">
+        <span><span class="dot live"></span>Live</span>
+        <span><span class="dot upcoming"></span>Upcoming</span>
+        <span><span class="dot ft"></span>Finished</span>
+        <span><span class="dot tbd"></span>Awaiting result</span>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/bracket.js') }}"></script>
+{% endblock %}

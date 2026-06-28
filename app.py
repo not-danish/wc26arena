@@ -697,6 +697,179 @@ def fixtures_api():
     return jsonify(_upcoming_fixtures(limit=limit, order=order))
 
 
+# ---------- Knockout bracket ----------
+# Mapping from bracket_slot -> resolved team name. Stored at
+# `data/bracket_results/{slot}` in Firebase. Admin fills these in as the
+# tournament progresses. Each fixture's home/away placeholder ("W R32-01")
+# gets resolved to the actual team via this map at request time.
+def _resolve_bracket_placeholder(label, bracket_results, group_winners=None):
+    """Map a placeholder like '1A', '2B', 'W R32-01', 'L SF-01' to a team
+    name if known. Returns the original label if no mapping exists yet."""
+    if not label:
+        return label
+    label = label.strip()
+    # Group-stage placeholders: "1A" = winner of Group A, "2B" = runner-up of B
+    if group_winners and len(label) == 2 and label[0] in '12' and label[1].isalpha():
+        key = label.upper()
+        return group_winners.get(key, label)
+    # "Best 3rd" stays a placeholder until you assign in Firebase
+    if label.lower().startswith('best 3'):
+        return bracket_results.get(f'best3_{label}', label)
+    # Winner/Loser of a slot: "W R32-01", "L SF-01"
+    parts = label.split()
+    if len(parts) >= 2 and parts[0] in ('W', 'L'):
+        slot = parts[1]
+        result = bracket_results.get(slot)
+        if not result:
+            return label
+        if parts[0] == 'W':
+            return result.get('winner', label)
+        return result.get('loser', label)
+    return label
+
+
+def _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores):
+    """Apply bracket placeholder resolution then run the usual enrichment."""
+    if fx.get('stage') and fx['stage'] != 'group':
+        fx = dict(fx)
+        fx['home_raw'] = fx.get('home')
+        fx['away_raw'] = fx.get('away')
+        fx['home'] = _resolve_bracket_placeholder(fx['home'], bracket_results, group_winners)
+        fx['away'] = _resolve_bracket_placeholder(fx['away'], bracket_results, group_winners)
+        fx['placeholder'] = (fx['home'] == fx['home_raw'] or fx['away'] == fx['away_raw'])
+    kickoff, enriched = _enrich_fixture(fx, now, scores)
+    return enriched
+
+
+@app.route('/api/bracket')
+def bracket_api():
+    """Return the full knockout bracket with placeholders resolved.
+
+    Reads `data/bracket_results/{slot}` from Firebase to substitute resolved
+    team names into placeholder slots like "W R32-01". Admins set these
+    values manually as matches finish.
+    """
+    try:
+        bracket_results = db.reference('data/bracket_results').get() or {}
+    except Exception:
+        bracket_results = {}
+    if isinstance(bracket_results, list):
+        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
+    try:
+        group_winners = db.reference('data/group_winners').get() or {}
+    except Exception:
+        group_winners = {}
+    if isinstance(group_winners, list):
+        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+
+    now = datetime.now(timezone.utc)
+    scores = _merged_scores()
+    rounds = {'r32': [], 'r16': [], 'qf': [], 'sf': [], '3p': [], 'final': []}
+    for fx in ALL_FIXTURES:
+        stage = fx.get('stage')
+        if stage not in rounds:
+            continue
+        enriched = _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores)
+        if not enriched:
+            continue
+        rounds[stage].append(enriched)
+    for stage in rounds:
+        rounds[stage].sort(key=lambda f: f.get('kickoff_utc') or '')
+
+    # Compute alive/eliminated teams (anyone who lost a knockout match)
+    eliminated = set()
+    for stage, matches in rounds.items():
+        for m in matches:
+            if m.get('status') != 'ft':
+                continue
+            sc = m.get('score') or {}
+            hs, as_ = sc.get('home_score'), sc.get('away_score')
+            if hs is None or as_ is None:
+                continue
+            if hs > as_:
+                eliminated.add(m['away'])
+            elif as_ > hs:
+                eliminated.add(m['home'])
+
+    return jsonify({
+        'rounds': rounds,
+        'eliminated': sorted(eliminated),
+        'updated_at': int(time.time()),
+    })
+
+
+@app.route('/api/survivors')
+def survivors_api():
+    """Per-country alive/eliminated status. Used by the survival tracker."""
+    try:
+        bracket_results = db.reference('data/bracket_results').get() or {}
+    except Exception:
+        bracket_results = {}
+    if isinstance(bracket_results, list):
+        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
+    try:
+        group_winners = db.reference('data/group_winners').get() or {}
+    except Exception:
+        group_winners = {}
+    if isinstance(group_winners, list):
+        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+
+    now = datetime.now(timezone.utc)
+    scores = _merged_scores()
+
+    # Trace every knockout result. Each loss eliminates a team; the deepest
+    # round they reached is their "exit stage".
+    stage_order = ['group', 'r32', 'r16', 'qf', 'sf', '3p', 'final']
+    exit_stage = {}     # team -> stage they were eliminated at
+    reached_stage = {}  # team -> deepest stage they appeared in
+
+    for fx in ALL_FIXTURES:
+        stage = fx.get('stage')
+        if stage == 'group' or stage not in stage_order:
+            continue
+        enriched = _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores)
+        if not enriched:
+            continue
+        for team in (enriched.get('home'), enriched.get('away')):
+            if not team:
+                continue
+            # Placeholder formats: "1A"/"2B", "Best 3rd …", "W R32-01", "L SF-02"
+            if (len(team) <= 3
+                    or team.startswith(('W ', 'L '))
+                    or team.lower().startswith('best 3')):
+                continue
+            cur = reached_stage.get(team)
+            if cur is None or stage_order.index(stage) > stage_order.index(cur):
+                reached_stage[team] = stage
+        if enriched.get('status') != 'ft':
+            continue
+        sc = enriched.get('score') or {}
+        hs, as_ = sc.get('home_score'), sc.get('away_score')
+        if hs is None or as_ is None:
+            continue
+        loser = enriched['away'] if hs > as_ else enriched['home'] if as_ > hs else None
+        if loser and loser not in exit_stage:
+            exit_stage[loser] = stage
+
+    # Every team in COUNTRY_GROUP plus any team we've seen in a knockout.
+    all_teams = set(COUNTRY_GROUP.keys()) | set(reached_stage.keys()) | set(exit_stage.keys())
+    rows = []
+    for team in sorted(all_teams):
+        rows.append({
+            'country': team,
+            'group': COUNTRY_GROUP.get(team),
+            'reached': reached_stage.get(team),
+            'eliminated_at': exit_stage.get(team),
+            'alive': team not in exit_stage,
+        })
+    rows.sort(key=lambda r: (
+        0 if r['alive'] else 1,
+        -stage_order.index(r['reached']) if r['reached'] in stage_order else 99,
+        r['country'],
+    ))
+    return jsonify({'teams': rows})
+
+
 @app.route('/api/scores')
 def scores_api():
     """Light-weight live scores snapshot for clients that want to poll just
@@ -766,7 +939,45 @@ def best_xi_api():
     Players are bucketed by position (GK / DEF / MID / FWD). Starters are
     the top N from each bucket; subs are the next batch. Designed so the
     page can reload and watch the lineup churn as ELOs shift from voting.
+
+    Query: ?alive=1 restricts to players whose national team is still in
+    the tournament (has not lost a knockout match).
     """
+    alive_only = request.args.get('alive') in ('1', 'true', 'yes')
+
+    eliminated = set()
+    if alive_only:
+        try:
+            bracket_results = db.reference('data/bracket_results').get() or {}
+        except Exception:
+            bracket_results = {}
+        if isinstance(bracket_results, list):
+            bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
+        try:
+            group_winners = db.reference('data/group_winners').get() or {}
+        except Exception:
+            group_winners = {}
+        if isinstance(group_winners, list):
+            group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+
+        now = datetime.now(timezone.utc)
+        scores = _merged_scores()
+        for fx in ALL_FIXTURES:
+            stage = fx.get('stage')
+            if stage in (None, 'group'):
+                continue
+            enriched = _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores)
+            if not enriched or enriched.get('status') != 'ft':
+                continue
+            sc = enriched.get('score') or {}
+            hs, as_ = sc.get('home_score'), sc.get('away_score')
+            if hs is None or as_ is None:
+                continue
+            if hs > as_:
+                eliminated.add(enriched.get('away'))
+            elif as_ > hs:
+                eliminated.add(enriched.get('home'))
+
     raw = db.reference('data/players').get() or {}
     if isinstance(raw, list):
         raw = {str(i): v for i, v in enumerate(raw) if v}
@@ -774,8 +985,11 @@ def best_xi_api():
     buckets = {"GK": [], "DEF": [], "MID": [], "FWD": []}
     for pid, p in raw.items():
         pos = p.get('position')
-        if pos in buckets:
-            buckets[pos].append((pid, p))
+        if pos not in buckets:
+            continue
+        if alive_only and p.get('country') in eliminated:
+            continue
+        buckets[pos].append((pid, p))
     for k in buckets:
         buckets[k].sort(key=lambda kv: kv[1].get('ELO', 0), reverse=True)
 
@@ -1209,6 +1423,43 @@ def fixtures_page():
 @app.route('/play')
 def play_page():
     return render_template("play.html")
+
+
+@app.route('/bracket')
+def bracket_page():
+    return render_template("bracket.html")
+
+
+@app.route('/survivors')
+def survivors_page():
+    return render_template("survivors.html")
+
+
+@app.route('/api/admin/bracket', methods=['POST'])
+def admin_set_bracket():
+    """Set a bracket slot result. Auth: X-Admin-Secret header.
+
+    Body: {"slot": "R32-01", "winner": "Argentina", "loser": "Saudi Arabia"}
+    Or for group winners: {"group_winners": {"1A": "Mexico", "2A": "South Korea"}}
+    """
+    if not ADMIN_SECRET:
+        return jsonify({"error": "admin endpoint disabled"}), 403
+    if request.headers.get('X-Admin-Secret') != ADMIN_SECRET:
+        return jsonify({"error": "unauthorized"}), 401
+    data = request.get_json(silent=True) or {}
+    if 'group_winners' in data:
+        db.reference('data/group_winners').update(data['group_winners'])
+        return jsonify({'ok': True, 'group_winners_set': list(data['group_winners'].keys())})
+    slot = data.get('slot')
+    if not slot:
+        return jsonify({'error': 'slot required'}), 400
+    payload = {}
+    if 'winner' in data: payload['winner'] = data['winner']
+    if 'loser' in data: payload['loser'] = data['loser']
+    if not payload:
+        return jsonify({'error': 'winner or loser required'}), 400
+    db.reference(f'data/bracket_results/{slot}').update(payload)
+    return jsonify({'ok': True, 'slot': slot, 'set': payload})
 
 
 

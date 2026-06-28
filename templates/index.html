@@ -35,6 +35,8 @@
     </div>
 </section>
 
+{% include "components/knockout_banner.html" %}
+
 {% with variant = 'rail' %}
     {% include "components/movers.html" %}
 {% endwith %}
@@ -42,4 +44,5 @@
 
 {% block scripts %}
     <script src="{{ url_for('static', filename='scripts/movers.js') }}"></script>
+    <script src="{{ url_for('static', filename='scripts/knockout_banner.js') }}"></script>
 {% endblock %}

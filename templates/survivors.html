@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Survivors · Last Teams Standing · wc26arena.com{% endblock %}
+
+{% block header_content %}
+<section class="wc-survivors-page">
+    <div class="wc-survivors-heading animate__animated animate__fadeInDown">
+        <span class="wc-bracket-eyebrow">LAST TEAMS STANDING</span>
+        <h1>Survivors</h1>
+        <p>Who's still alive. Who's gone home.</p>
+    </div>
+
+    <div class="wc-survivors-summary">
+        <div class="stat">
+            <span class="num alive" id="wc_sv_alive">—</span>
+            <span class="label">Alive</span>
+        </div>
+        <div class="stat">
+            <span class="num eliminated" id="wc_sv_elim">—</span>
+            <span class="label">Eliminated</span>
+        </div>
+        <div class="stat">
+            <span class="num" id="wc_sv_total">48</span>
+            <span class="label">Started</span>
+        </div>
+    </div>
+
+    <div class="wc-survivors-tabs">
+        <button class="wc-survivors-tab active" data-filter="all">All teams</button>
+        <button class="wc-survivors-tab" data-filter="alive">Alive</button>
+        <button class="wc-survivors-tab" data-filter="eliminated">Eliminated</button>
+    </div>
+
+    <div id="wc_survivors_grid" class="wc-survivors-grid">
+        <div class="wc-loading">Loading survivors…</div>
+    </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+    <script src="{{ url_for('static', filename='scripts/survivors.js') }}"></script>
+{% endblock %}

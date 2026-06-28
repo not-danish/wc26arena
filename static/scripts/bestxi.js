@@ -77,28 +77,39 @@ function subCardHtml(p, bucket) {
         </div>`;
 }
 
+let aliveOnly = false;
+
 async function loadBestXi() {
     const pitch = document.getElementById('wc_pitch');
     const subsRow = document.getElementById('wc_subs_row');
+    const subtitle = document.getElementById('wc_bestxi_subtitle');
 
     const loading = document.createElement('div');
     loading.className = 'wc-pitch-loading';
     loading.textContent = 'COMPUTING…';
     pitch.appendChild(loading);
 
+    const url = aliveOnly ? '/api/best_xi?alive=1' : '/api/best_xi';
     let data;
     try {
-        data = await fetch('/api/best_xi').then(r => r.json());
+        data = await fetch(url).then(r => r.json());
     } catch (e) {
         loading.textContent = 'Failed to load.';
         return;
     }
     loading.remove();
 
+    if (subtitle) {
+        subtitle.textContent = aliveOnly
+            ? 'Best XI of the survivors · only players from teams still alive · 3-4-3'
+            : 'Highest-rated lineup right now · 3-4-3 · Refresh to recompute';
+    }
+
     for (const row of pitch.querySelectorAll('.wc-row')) {
         const bucket = row.dataset.bucket;
         const players = (data.starters && data.starters[bucket]) || [];
-        row.innerHTML = players.map(pitchPlayerHtml).join('');
+        row.innerHTML = players.map(pitchPlayerHtml).join('') ||
+            '<div class="wc-pitch-empty">No survivors at this position.</div>';
     }
 
     const subs = data.subs || {};
@@ -107,6 +118,12 @@ async function loadBestXi() {
         .flatMap(b => (subs[b] || []).map(p => subCardHtml(p, b)))
         .join('');
 }
+
+document.getElementById('wc_ko_xi_toggle')?.addEventListener('click', (e) => {
+    aliveOnly = !aliveOnly;
+    e.currentTarget.classList.toggle('active', aliveOnly);
+    loadBestXi();
+});
 
 loadBestXi();
 

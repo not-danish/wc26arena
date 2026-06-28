@@ -128,6 +128,22 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-nav-links a:hover::after { transform: scaleX(1); }
 
+/* Bracket link gets a small red dot to flag the knockout-stage URGENT vibe.
+   Subtle on its own but visually anchors the top nav to the new feature. */
+.wc-nav-knockout {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.4rem;
+}
+.wc-nav-knockout::before {
+  content: '';
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--wc-knockout-red);
+  box-shadow: 0 0 6px var(--wc-knockout-red);
+  animation: pulseLive 1.4s infinite;
+}
+
 /* Live vote tally pill in the nav. The dot pulses to signal "live data". */
 .wc-nav-tally a {
   display: inline-flex;
@@ -930,6 +946,17 @@ a:hover { color: var(--wc-gold-bright); }
   letter-spacing: 0.3em;
   color: var(--wc-gold);
 }
+.wc-pitch-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--wc-text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
 
 /* Subs */
 .wc-subs {
@@ -1439,8 +1466,49 @@ a:hover { color: var(--wc-gold-bright); }
 }
 .wc-fixtures-controls {
   max-width: 480px;
-  margin: 0 auto 2rem;
+  margin: 0 auto 1rem;
 }
+
+/* Pill row for filtering fixtures by tournament stage. */
+.wc-stage-filter {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0 auto 1.5rem;
+  max-width: 720px;
+}
+.wc-stage-pill {
+  padding: 0.35rem 0.85rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  border-radius: 999px;
+  color: var(--wc-text-muted);
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.1em;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wc-stage-pill:hover {
+  color: var(--wc-text);
+  border-color: var(--wc-gold-dark);
+}
+.wc-stage-pill.active {
+  background: var(--wc-gold);
+  color: var(--wc-black);
+  border-color: var(--wc-gold);
+}
+.wc-stage-pill.knockout {
+  border-color: var(--wc-knockout-red);
+  color: var(--wc-knockout-red);
+}
+.wc-stage-pill.knockout.active {
+  background: var(--wc-knockout-red);
+  color: var(--wc-white);
+  border-color: var(--wc-knockout-red);
+}
+
 .wc-fixtures-list { display: flex; flex-direction: column; gap: 0.75rem; }
 .wc-fixtures-date {
   font-family: var(--font-display);
@@ -1520,6 +1588,35 @@ a:hover { color: var(--wc-gold-bright); }
 .wc-fixture-card.wc-fixture-ft {
   opacity: 0.85;
 }
+/* Knockout fixtures get a red glow + a stage badge so they stand out in the
+   schedule list as separate from the group-stage exhibition matches. */
+.wc-fixture-card.wc-fixture-knockout {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.05) 0%, var(--wc-charcoal) 35%);
+  border-left: 3px solid var(--wc-knockout-red);
+}
+.wc-fixture-card.wc-fixture-knockout:hover {
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.10) 0%, rgba(201, 162, 39, 0.06) 50%);
+  border-color: var(--wc-knockout-red);
+}
+.wc-fixture-stage {
+  display: inline-block;
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.5rem;
+  background: var(--wc-knockout-red);
+  color: var(--wc-white);
+  border-radius: 3px;
+  margin-right: 0.5rem;
+  vertical-align: middle;
+}
+.wc-fixture-stage.stage-final {
+  background: linear-gradient(135deg, var(--wc-gold) 0%, var(--wc-gold-bright) 100%);
+  color: var(--wc-black);
+  box-shadow: 0 0 8px rgba(232, 197, 71, 0.4);
+}
+.wc-fixture-stage.stage-sf  { background: var(--wc-knockout-red-deep); }
+.wc-fixture-stage.stage-3p  { background: var(--wc-graphite); }
 .wc-fixture-teams {
   display: flex;
   flex-wrap: wrap;
@@ -2456,4 +2553,721 @@ a:hover { color: var(--wc-gold-bright); }
 }
 @media (max-width: 640px) {
   .wc-movers-side .wc-movers-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================
+   KNOCKOUT-STAGE THEME
+   The tournament shifts tone from group-stage exhibition to
+   win-or-go-home. Adds red-urgency accents to the gold/black
+   base, plus the bracket page chrome.
+   ============================================================ */
+:root {
+  --wc-knockout-red:    #DC2626;
+  --wc-knockout-red-deep: #7F1D1D;
+  --wc-knockout-glow:   rgba(220, 38, 38, 0.35);
+  --wc-elim-gray:       #4A4A4A;
+  --wc-alive-green:     #22C55E;
+}
+
+/* ---- Knockout hero (homepage banner) ---- */
+.wc-knockout-banner {
+  position: relative;
+  margin: 1.5rem auto 0;
+  max-width: 1100px;
+  padding: 1.25rem 1.5rem;
+  background:
+    linear-gradient(135deg,
+      rgba(220, 38, 38, 0.18) 0%,
+      rgba(26, 26, 26, 0.95) 45%,
+      rgba(26, 26, 26, 0.95) 100%),
+    var(--wc-charcoal);
+  border: 1px solid var(--wc-knockout-red);
+  border-left: 4px solid var(--wc-knockout-red);
+  border-radius: 8px;
+  box-shadow:
+    0 0 32px rgba(220, 38, 38, 0.15),
+    0 8px 24px rgba(0, 0, 0, 0.5);
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 1.5rem;
+  overflow: hidden;
+}
+.wc-knockout-banner::before {
+  content: '';
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 12px,
+    rgba(220, 38, 38, 0.04) 12px 13px
+  );
+  pointer-events: none;
+}
+.wc-knockout-banner-icon {
+  position: relative;
+  font-size: 2.5rem;
+  filter: drop-shadow(0 0 12px var(--wc-knockout-glow));
+  animation: knockoutPulse 2s ease-in-out infinite;
+}
+@keyframes knockoutPulse {
+  0%, 100% { transform: scale(1); filter: drop-shadow(0 0 12px var(--wc-knockout-glow)); }
+  50%      { transform: scale(1.08); filter: drop-shadow(0 0 22px var(--wc-knockout-red)); }
+}
+.wc-knockout-banner-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.wc-knockout-banner-eyebrow {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  color: var(--wc-knockout-red);
+  font-weight: 700;
+}
+.wc-knockout-banner-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--wc-white);
+  letter-spacing: 0.05em;
+  margin: 0;
+}
+.wc-knockout-banner-title .accent { color: var(--wc-gold); }
+.wc-knockout-banner-sub {
+  font-size: 0.85rem;
+  color: var(--wc-text-muted);
+  margin: 0;
+}
+.wc-knockout-banner-cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.2rem;
+  background: var(--wc-gold);
+  color: var(--wc-black);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  border-radius: 4px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+.wc-knockout-banner-cta:hover {
+  background: var(--wc-gold-bright);
+  color: var(--wc-black);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 162, 39, 0.4);
+}
+.wc-knockout-banner-countdown {
+  display: flex;
+  gap: 0.8rem;
+}
+.wc-knockout-banner-countdown .seg {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 44px;
+  padding: 0.4rem 0.6rem;
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(220, 38, 38, 0.3);
+  border-radius: 4px;
+}
+.wc-knockout-banner-countdown .seg-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.6rem;
+  line-height: 1;
+  color: var(--wc-white);
+  font-variant-numeric: tabular-nums;
+}
+.wc-knockout-banner-countdown .seg-label {
+  font-size: 0.55rem;
+  letter-spacing: 0.2em;
+  color: var(--wc-text-muted);
+  text-transform: uppercase;
+  margin-top: 0.15rem;
+}
+.wc-knockout-banner.live {
+  border-color: var(--wc-alive-green);
+  border-left-color: var(--wc-alive-green);
+  box-shadow: 0 0 32px rgba(34, 197, 94, 0.18), 0 8px 24px rgba(0,0,0,0.5);
+}
+.wc-knockout-banner.live .wc-knockout-banner-eyebrow { color: var(--wc-alive-green); }
+
+@media (max-width: 720px) {
+  .wc-knockout-banner {
+    grid-template-columns: auto 1fr;
+    gap: 1rem;
+    padding: 1rem;
+  }
+  .wc-knockout-banner-cta,
+  .wc-knockout-banner-countdown {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+    justify-content: center;
+  }
+  .wc-knockout-banner-title { font-size: 1.4rem; }
+}
+
+/* ---- Bracket page ---- */
+.wc-bracket-page {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+.wc-bracket-heading {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+.wc-bracket-eyebrow {
+  display: inline-block;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.85rem;
+  letter-spacing: 0.25em;
+  color: var(--wc-knockout-red);
+  padding: 0.3rem 0.8rem;
+  border: 1px solid var(--wc-knockout-red);
+  border-radius: 999px;
+  margin-bottom: 0.75rem;
+  background: rgba(220, 38, 38, 0.08);
+}
+.wc-bracket-heading h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: 0.04em;
+  margin: 0;
+  background: linear-gradient(180deg, var(--wc-white) 0%, var(--wc-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.wc-bracket-heading p {
+  color: var(--wc-text-muted);
+  font-size: 1rem;
+  margin: 0.4rem 0 0;
+}
+
+.wc-bracket-meta {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin: 0 auto 2rem;
+  padding: 1rem 1.5rem;
+  background: rgba(26, 26, 26, 0.6);
+  border: 1px solid var(--wc-border);
+  border-radius: 6px;
+  max-width: 600px;
+}
+.wc-bracket-meta-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wc-bracket-meta-num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.8rem;
+  line-height: 1;
+  color: var(--wc-gold);
+  font-variant-numeric: tabular-nums;
+}
+.wc-bracket-meta-label {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wc-text-muted);
+  margin-top: 0.3rem;
+}
+
+/* Horizontal scroller so the tree always fits */
+.wc-bracket-scroller {
+  overflow-x: auto;
+  overflow-y: visible;
+  padding: 1rem 0.5rem;
+  margin: 0 -1.5rem;
+  /* dark scrollbar to match */
+  scrollbar-color: var(--wc-graphite) var(--wc-black);
+}
+.wc-bracket-scroller::-webkit-scrollbar { height: 8px; }
+.wc-bracket-scroller::-webkit-scrollbar-track { background: var(--wc-black); }
+.wc-bracket-scroller::-webkit-scrollbar-thumb {
+  background: var(--wc-graphite);
+  border-radius: 4px;
+}
+
+.wc-bracket-tree { min-width: max-content; padding: 0 1.5rem; }
+.bk-tree-cols {
+  display: grid;
+  grid-template-columns: 220px 220px 220px 220px 240px 180px;
+  gap: 1.25rem;
+  align-items: stretch;
+}
+.bk-col {
+  display: flex;
+  flex-direction: column;
+}
+.bk-col-title {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.18em;
+  color: var(--wc-gold);
+  text-align: center;
+  margin: 0 0 0.75rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--wc-gold-dark);
+}
+.bk-col-matches {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  flex: 1;
+  gap: 0.75rem;
+}
+/* As the tree narrows, give later-round columns more vertical spacing
+   between matches so they visually line up with their feeders. */
+.bk-col-r16 .bk-col-matches { gap: 2.5rem; }
+.bk-col-qf  .bk-col-matches { gap: 6rem; }
+.bk-col-sf  .bk-col-matches { gap: 14rem; }
+.bk-col-final .bk-col-matches { justify-content: center; }
+
+.bk-match {
+  display: flex;
+  flex-direction: column;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  border-radius: 6px;
+  padding: 0.5rem;
+  text-decoration: none;
+  color: var(--wc-text);
+  transition: all 0.15s ease;
+  position: relative;
+}
+.bk-match.clickable:hover {
+  border-color: var(--wc-gold);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.5), 0 0 0 1px var(--wc-gold-dark);
+}
+.bk-match.static { opacity: 0.7; cursor: default; }
+.bk-match.stage-final {
+  background: linear-gradient(135deg, rgba(201, 162, 39, 0.15) 0%, var(--wc-charcoal) 60%);
+  border-color: var(--wc-gold);
+}
+
+.bk-match-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.4rem;
+  font-size: 0.65rem;
+}
+.bk-slot {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.12em;
+  color: var(--wc-text-muted);
+  font-size: 0.7rem;
+}
+.bk-badge {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.08em;
+  padding: 0.1rem 0.4rem;
+  border-radius: 3px;
+  font-size: 0.65rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.bk-badge.live {
+  background: var(--wc-knockout-red);
+  color: var(--wc-white);
+  animation: pulseLive 1.4s infinite;
+}
+.bk-badge.live .dot {
+  width: 6px; height: 6px;
+  background: var(--wc-white);
+  border-radius: 50%;
+}
+@keyframes pulseLive {
+  0%, 100% { box-shadow: 0 0 0 0 var(--wc-knockout-glow); }
+  50%      { box-shadow: 0 0 0 6px transparent; }
+}
+.bk-badge.ft { background: var(--wc-graphite); color: var(--wc-text-muted); }
+.bk-badge.upcoming { background: rgba(201, 162, 39, 0.15); color: var(--wc-gold); }
+.bk-badge.tbd { background: rgba(255,255,255,0.06); color: var(--wc-text-muted); }
+
+.bk-team {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.4rem 0.3rem;
+  border-radius: 4px;
+  margin-bottom: 0.15rem;
+  transition: all 0.15s ease;
+}
+.bk-team:last-child { margin-bottom: 0; }
+.bk-team-flag {
+  font-size: 1.25rem;
+  line-height: 1;
+  text-align: center;
+}
+.bk-team-flag.tbd {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.95rem;
+  color: var(--wc-text-muted);
+  background: rgba(255,255,255,0.05);
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.bk-team-name {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--wc-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.bk-team-name.tbd {
+  color: var(--wc-text-muted);
+  font-style: italic;
+  font-size: 0.78rem;
+}
+.bk-team-score {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  color: var(--wc-text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 1.5ch;
+  text-align: right;
+}
+.bk-team.winner {
+  background: rgba(34, 197, 94, 0.08);
+  border-left: 2px solid var(--wc-alive-green);
+}
+.bk-team.winner .bk-team-name { color: var(--wc-white); font-weight: 600; }
+.bk-team.winner .bk-team-score { color: var(--wc-alive-green); font-weight: 700; }
+.bk-team.loser {
+  opacity: 0.45;
+  text-decoration: line-through;
+  text-decoration-color: var(--wc-knockout-red);
+  text-decoration-thickness: 2px;
+}
+.bk-team.loser .bk-team-score { color: var(--wc-knockout-red); }
+
+.bk-match-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.4rem;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--wc-border);
+  font-size: 0.65rem;
+  color: var(--wc-text-muted);
+}
+.bk-venue {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+.bk-cta {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.12em;
+  color: var(--wc-gold);
+  font-size: 0.7rem;
+}
+.bk-match-empty {
+  padding: 1rem;
+  text-align: center;
+  color: var(--wc-text-muted);
+  font-size: 0.85rem;
+  border: 1px dashed var(--wc-border);
+  border-radius: 4px;
+}
+
+/* Trophy column */
+.bk-col-trophy { align-items: center; justify-content: center; }
+.bk-trophy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 1rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-gold);
+  border-radius: 8px;
+  text-align: center;
+  min-width: 160px;
+}
+.bk-trophy .trophy-glyph {
+  font-size: 3rem;
+  filter: grayscale(0.5);
+  opacity: 0.7;
+}
+.bk-trophy.crowned .trophy-glyph {
+  filter: drop-shadow(0 0 16px var(--wc-gold-bright));
+  opacity: 1;
+  animation: trophyShine 3s ease-in-out infinite;
+}
+@keyframes trophyShine {
+  0%,100% { transform: scale(1); }
+  50%     { transform: scale(1.06); filter: drop-shadow(0 0 24px var(--wc-gold-bright)); }
+}
+.bk-trophy .trophy-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.8rem;
+  letter-spacing: 0.2em;
+  color: var(--wc-text-muted);
+}
+.bk-trophy .trophy-team {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  color: var(--wc-gold);
+}
+
+/* Third-place playoff lives below the main tree */
+.bk-third {
+  max-width: 360px;
+  margin: 3rem auto 0;
+  text-align: center;
+}
+.bk-third .bk-col-title {
+  color: var(--wc-knockout-red);
+  border-bottom-color: var(--wc-knockout-red-deep);
+}
+.bk-third-match .bk-match { background: linear-gradient(135deg, rgba(220, 38, 38, 0.08) 0%, var(--wc-charcoal) 70%); }
+
+/* Legend */
+.wc-bracket-legend {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  margin-top: 2.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--wc-border);
+  flex-wrap: wrap;
+}
+.wc-bracket-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--wc-text-muted);
+}
+.wc-bracket-legend .dot {
+  width: 10px; height: 10px; border-radius: 50%;
+}
+.wc-bracket-legend .dot.live { background: var(--wc-knockout-red); box-shadow: 0 0 8px var(--wc-knockout-red); }
+.wc-bracket-legend .dot.upcoming { background: var(--wc-gold); }
+.wc-bracket-legend .dot.ft { background: var(--wc-graphite); }
+.wc-bracket-legend .dot.tbd { background: rgba(255,255,255,0.15); }
+
+@media (max-width: 900px) {
+  .bk-tree-cols {
+    grid-template-columns: 200px 200px 200px 200px 220px 160px;
+    gap: 1rem;
+  }
+}
+
+/* ============================================================
+   SURVIVORS PAGE
+   ============================================================ */
+.wc-survivors-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+}
+.wc-survivors-heading {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+.wc-survivors-heading h1 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: clamp(2.5rem, 6vw, 4rem);
+  letter-spacing: 0.04em;
+  margin: 0.4rem 0;
+  background: linear-gradient(180deg, var(--wc-white) 0%, var(--wc-gold) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.wc-survivors-heading p {
+  color: var(--wc-text-muted);
+  font-size: 1rem;
+  margin: 0;
+}
+.wc-survivors-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+}
+.wc-survivors-tab {
+  padding: 0.5rem 1.2rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  border-radius: 999px;
+  color: var(--wc-text-muted);
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.1em;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wc-survivors-tab.active {
+  background: var(--wc-gold);
+  color: var(--wc-black);
+  border-color: var(--wc-gold);
+}
+.wc-survivors-tab:hover:not(.active) {
+  border-color: var(--wc-gold-dark);
+  color: var(--wc-text);
+}
+
+.wc-survivors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+.wc-survivor-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-border);
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--wc-text);
+  transition: all 0.15s ease;
+  position: relative;
+  overflow: hidden;
+}
+.wc-survivor-card:hover {
+  border-color: var(--wc-gold);
+  transform: translateY(-1px);
+}
+.wc-survivor-card.alive {
+  border-left: 3px solid var(--wc-alive-green);
+}
+.wc-survivor-card.eliminated {
+  border-left: 3px solid var(--wc-knockout-red);
+  background: linear-gradient(90deg, rgba(220, 38, 38, 0.06) 0%, var(--wc-charcoal) 60%);
+}
+.wc-survivor-card.eliminated .wc-survivor-flag,
+.wc-survivor-card.eliminated .wc-survivor-name {
+  opacity: 0.55;
+}
+.wc-survivor-card.eliminated .wc-survivor-name {
+  text-decoration: line-through;
+  text-decoration-color: var(--wc-knockout-red);
+  text-decoration-thickness: 1.5px;
+}
+.wc-survivor-flag {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.wc-survivor-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.wc-survivor-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wc-survivor-meta {
+  font-size: 0.7rem;
+  color: var(--wc-text-muted);
+  margin-top: 0.15rem;
+  letter-spacing: 0.05em;
+}
+.wc-survivor-status {
+  font-family: 'Bebas Neue', sans-serif;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+  padding: 0.18rem 0.45rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+.wc-survivor-status.alive {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--wc-alive-green);
+}
+.wc-survivor-status.eliminated {
+  background: rgba(220, 38, 38, 0.15);
+  color: var(--wc-knockout-red);
+}
+
+.wc-survivors-summary {
+  display: flex;
+  justify-content: center;
+  gap: 2rem;
+  margin: 0 auto 2rem;
+  padding: 1rem;
+  background: rgba(26,26,26,0.6);
+  border: 1px solid var(--wc-border);
+  border-radius: 6px;
+  max-width: 500px;
+}
+.wc-survivors-summary .stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.wc-survivors-summary .num {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.wc-survivors-summary .num.alive { color: var(--wc-alive-green); }
+.wc-survivors-summary .num.eliminated { color: var(--wc-knockout-red); }
+.wc-survivors-summary .label {
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--wc-text-muted);
+  margin-top: 0.3rem;
+}
+
+/* ============================================================
+   KNOCKOUT MODE TOGGLE (Best XI page)
+   ============================================================ */
+.wc-knockout-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: var(--wc-charcoal);
+  border: 1px solid var(--wc-knockout-red);
+  border-radius: 999px;
+  color: var(--wc-text);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.9rem;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.wc-knockout-toggle.active {
+  background: var(--wc-knockout-red);
+  color: var(--wc-white);
+  box-shadow: 0 0 16px var(--wc-knockout-glow);
+}
+.wc-knockout-toggle:hover { transform: translateY(-1px); }
+.wc-knockout-toggle .dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--wc-knockout-red);
+}
+.wc-knockout-toggle.active .dot {
+  background: var(--wc-white);
+  animation: pulseLive 1.4s infinite;
 }
