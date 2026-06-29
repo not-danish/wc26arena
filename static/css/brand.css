@@ -3133,6 +3133,78 @@ a:hover { color: var(--wc-gold-bright); }
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
 }
+
+/* All-teams view: split the 48 teams into their 12 World Cup groups so
+   you can see at a glance how each group fared. Two group panels per row
+   on wide screens, stacked below. */
+.wc-survivors-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  gap: 1.25rem;
+}
+.wc-survivors-group {
+  background: rgba(26, 26, 26, 0.6);
+  border: 1px solid var(--wc-border);
+  border-radius: 8px;
+  padding: 0.9rem 1rem 1rem;
+}
+.wc-survivors-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 0.65rem;
+  padding-bottom: 0.4rem;
+  border-bottom: 1px solid var(--wc-border);
+}
+.wc-survivors-group-head h3 {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.1rem;
+  letter-spacing: 0.18em;
+  color: var(--wc-gold);
+  margin: 0;
+}
+.wc-survivors-group-count {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 0.75rem;
+  letter-spacing: 0.12em;
+  padding: 0.18rem 0.55rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.06);
+  color: var(--wc-text-muted);
+}
+.wc-survivors-group-count.all-alive {
+  background: rgba(34, 197, 94, 0.18);
+  color: var(--wc-alive-green);
+}
+.wc-survivors-group-count.partial {
+  background: rgba(232, 197, 71, 0.15);
+  color: var(--wc-gold-bright);
+}
+.wc-survivors-group-count.all-out {
+  background: rgba(220, 38, 38, 0.18);
+  color: var(--wc-knockout-red);
+}
+.wc-survivors-group-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.4rem;
+}
+/* Inside a group, tighter cards so 4 teams fit comfortably. */
+.wc-survivors-group-grid .wc-survivor-card {
+  padding: 0.55rem 0.7rem;
+}
+.wc-survivors-group-grid .wc-survivor-flag {
+  font-size: 1.4rem;
+}
+.wc-survivors-group-grid .wc-survivor-name {
+  font-size: 0.85rem;
+}
+.wc-survivors-group-grid .wc-survivor-meta {
+  font-size: 0.65rem;
+}
+@media (max-width: 480px) {
+  .wc-survivors-groups { grid-template-columns: 1fr; }
+}
 .wc-survivor-card {
   display: flex;
   align-items: center;

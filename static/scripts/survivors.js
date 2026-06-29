@@ -23,40 +23,82 @@
     let allTeams = [];
     let currentFilter = 'all';
 
-    function renderCards(teams) {
+    function teamCard(t) {
+        const aliveCls = t.alive ? 'alive' : 'eliminated';
+        const status = t.alive
+            ? `<span class="wc-survivor-status alive">ALIVE</span>`
+            : `<span class="wc-survivor-status eliminated">OUT · ${esc(STAGE_LABELS[t.eliminated_at] || 'Group')}</span>`;
+        const reached = t.reached ? STAGE_DEEP[t.reached] : 'Group stage';
+        const groupBadge = t.group ? `Group ${esc(t.group)} · ` : '';
+        return `
+            <a class="wc-survivor-card ${aliveCls}" href="/leaderboard?country=${encodeURIComponent(t.country)}">
+                <span class="wc-survivor-flag">${flag(t.country)}</span>
+                <div class="wc-survivor-body">
+                    <span class="wc-survivor-name">${esc(t.country)}</span>
+                    <span class="wc-survivor-meta">${groupBadge}${esc(reached)}</span>
+                </div>
+                ${status}
+            </a>`;
+    }
+
+    function renderFlat(teams) {
         const grid = document.getElementById('wc_survivors_grid');
         if (!teams.length) {
             grid.innerHTML = '<div class="wc-loading">No teams match this filter.</div>';
             return;
         }
-        grid.innerHTML = teams.map(t => {
-            const aliveCls = t.alive ? 'alive' : 'eliminated';
-            const status = t.alive
-                ? `<span class="wc-survivor-status alive">ALIVE</span>`
-                : `<span class="wc-survivor-status eliminated">OUT · ${esc(STAGE_LABELS[t.eliminated_at] || 'Group')}</span>`;
-            const reached = t.reached
-                ? STAGE_DEEP[t.reached]
-                : 'Group stage';
-            const groupBadge = t.group ? `Group ${esc(t.group)} · ` : '';
+        grid.className = 'wc-survivors-grid';
+        grid.innerHTML = teams.map(teamCard).join('');
+    }
+
+    function renderGrouped(teams) {
+        // Bucket every team by its group letter. Teams without a group
+        // (shouldn't happen for real WC entrants) fall into "?".
+        const buckets = new Map();
+        for (const t of teams) {
+            const key = t.group || '?';
+            if (!buckets.has(key)) buckets.set(key, []);
+            buckets.get(key).push(t);
+        }
+        // Within each group, alive teams come first, then sort by name so
+        // the layout is deterministic.
+        for (const arr of buckets.values()) {
+            arr.sort((a, b) =>
+                (a.alive === b.alive ? 0 : a.alive ? -1 : 1) ||
+                a.country.localeCompare(b.country));
+        }
+        const keys = [...buckets.keys()].sort();
+        const grid = document.getElementById('wc_survivors_grid');
+        grid.className = 'wc-survivors-groups';
+        grid.innerHTML = keys.map(k => {
+            const teams = buckets.get(k);
+            const alive = teams.filter(t => t.alive).length;
+            const total = teams.length;
+            const aliveAll = alive === total;
+            const aliveNone = alive === 0;
+            const badgeCls = aliveAll ? 'all-alive' : aliveNone ? 'all-out' : 'partial';
             return `
-                <a class="wc-survivor-card ${aliveCls}" href="/leaderboard?country=${encodeURIComponent(t.country)}">
-                    <span class="wc-survivor-flag">${flag(t.country)}</span>
-                    <div class="wc-survivor-body">
-                        <span class="wc-survivor-name">${esc(t.country)}</span>
-                        <span class="wc-survivor-meta">${groupBadge}${esc(reached)}</span>
+                <section class="wc-survivors-group">
+                    <header class="wc-survivors-group-head">
+                        <h3>Group ${esc(k)}</h3>
+                        <span class="wc-survivors-group-count ${badgeCls}">${alive}/${total} alive</span>
+                    </header>
+                    <div class="wc-survivors-group-grid">
+                        ${teams.map(teamCard).join('')}
                     </div>
-                    ${status}
-                </a>`;
+                </section>`;
         }).join('');
     }
 
     function applyFilter() {
+        if (currentFilter === 'all') {
+            renderGrouped(allTeams);
+            return;
+        }
         const filtered = currentFilter === 'alive'
             ? allTeams.filter(t => t.alive)
-            : currentFilter === 'eliminated'
-                ? allTeams.filter(t => !t.alive)
-                : allTeams;
-        renderCards(filtered);
+            : allTeams.filter(t => !t.alive);
+        renderFlat(filtered);
     }
 
     async function load() {
