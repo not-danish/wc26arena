@@ -733,6 +733,46 @@ _PLACEHOLDER_RE = re.compile(
     re.IGNORECASE,
 )
 
+
+# Top-to-bottom display order for each knockout column on the bracket page.
+# Built by walking the dependency tree so feeder matches in earlier rounds
+# sit visually adjacent to the consumer match they feed into. Without this,
+# columns would sort by kickoff time and the tree wouldn't line up.
+#
+# SF-01 = QF-01 + QF-02  (top half)    SF-02 = QF-03 + QF-04  (bottom half)
+#  QF-01 = R16-01 + R16-02              QF-03 = R16-03 + R16-04
+#  QF-02 = R16-05 + R16-06              QF-04 = R16-07 + R16-08
+#   R16-01 = R32-01 + R32-04
+#   R16-02 = R32-03 + R32-06
+#   R16-05 = R32-12 + R32-11
+#   R16-06 = R32-10 + R32-09
+#   R16-03 = R32-02 + R32-05
+#   R16-04 = R32-07 + R32-08
+#   R16-07 = R32-14 + R32-15
+#   R16-08 = R32-13 + R32-16
+_BRACKET_ORDER = {
+    'r32': [
+        'R32-01', 'R32-04',          # → R16-01
+        'R32-03', 'R32-06',          # → R16-02
+        'R32-12', 'R32-11',          # → R16-05
+        'R32-10', 'R32-09',          # → R16-06
+        'R32-02', 'R32-05',          # → R16-03
+        'R32-07', 'R32-08',          # → R16-04
+        'R32-14', 'R32-15',          # → R16-07
+        'R32-13', 'R32-16',          # → R16-08
+    ],
+    'r16': [
+        'R16-01', 'R16-02',          # → QF-01
+        'R16-05', 'R16-06',          # → QF-02
+        'R16-03', 'R16-04',          # → QF-03
+        'R16-07', 'R16-08',          # → QF-04
+    ],
+    'qf':    ['QF-01', 'QF-02', 'QF-03', 'QF-04'],
+    'sf':    ['SF-01', 'SF-02'],
+    '3p':    ['3P'],
+    'final': ['FINAL'],
+}
+
 def _is_placeholder_label(s):
     """True if a team field still holds an unresolved bracket placeholder
     like '1A', '2B', 'W R32-01', 'L SF-02', 'Best 3rd …'. Real country names
@@ -759,6 +799,82 @@ def _enrich_knockout_fixture(fx, bracket_results, group_winners, now, scores):
     return enriched
 
 
+def _auto_bracket_results(scores):
+    """Derive {bracket_slot: {winner, loser}} from finished knockout scores.
+
+    Walks the bracket in order so an earlier round's auto-resolved winner can
+    feed into the next round's placeholder. Stops cascading the moment a
+    round has a tie or missing score — the rest of the tree stays in
+    placeholder form until admin enters values via /api/admin/bracket.
+    """
+    auto = {}
+    # Walk rounds in dependency order so R16 can use the R32 winners we
+    # just resolved, then QF picks up R16, etc.
+    stage_order = ['r32', 'r16', 'qf', 'sf', '3p', 'final']
+    fixtures_by_stage = {s: [] for s in stage_order}
+    for fx in ALL_FIXTURES:
+        if fx.get('stage') in fixtures_by_stage:
+            fixtures_by_stage[fx['stage']].append(fx)
+
+    for stage in stage_order:
+        for fx in fixtures_by_stage[stage]:
+            slot = fx.get('bracket_slot')
+            if not slot:
+                continue
+            # Resolve home/away through the auto map we've built so far,
+            # so an R16 match whose feeders were just auto-resolved sees
+            # real team names here.
+            home = _resolve_bracket_placeholder(fx.get('home'), auto)
+            away = _resolve_bracket_placeholder(fx.get('away'), auto)
+            if _is_placeholder_label(home) or _is_placeholder_label(away):
+                continue
+            sc = scores.get(fx['id']) or {}
+            hs, as_ = sc.get('home_score'), sc.get('away_score')
+            if hs is None or as_ is None:
+                continue
+            status = (sc.get('status') or '').lower()
+            # Only trust the result if the match is actually finished.
+            # Live or in-progress scores must not pre-eliminate a team.
+            if not ('finished' in status or status in ('ft', 'match finished', 'aet', 'ap')):
+                continue
+            if hs > as_:
+                auto[slot] = {'winner': home, 'loser': away}
+            elif as_ > hs:
+                auto[slot] = {'winner': away, 'loser': home}
+            # Draws (penalty wins) need admin to set explicitly — the score
+            # alone doesn't say who advanced.
+    return auto
+
+
+def _load_bracket_state():
+    """Fetch admin overrides + group winners from Firebase and merge with
+    auto-derived results from live scores. Admin values take precedence so
+    penalty-shootout winners (which can't be inferred from the score line
+    alone) and other manual corrections always stick.
+    """
+    try:
+        manual = db.reference('data/bracket_results').get() or {}
+    except Exception:
+        manual = {}
+    if isinstance(manual, list):
+        manual = {str(i): v for i, v in enumerate(manual) if v}
+    try:
+        group_winners = db.reference('data/group_winners').get() or {}
+    except Exception:
+        group_winners = {}
+    if isinstance(group_winners, list):
+        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+
+    scores = _merged_scores()
+    auto = _auto_bracket_results(scores)
+    # Merge: start with auto, let manual overrides win.
+    merged = dict(auto)
+    for slot, val in manual.items():
+        if isinstance(val, dict):
+            merged[slot] = {**merged.get(slot, {}), **val}
+    return merged, group_winners, scores
+
+
 def _compute_eliminated_teams(now=None):
     """Single source of truth for which national teams are out.
 
@@ -770,20 +886,7 @@ def _compute_eliminated_teams(now=None):
     The R32 check only kicks in once the R32 lineup is actually known.
     """
     now = now or datetime.now(timezone.utc)
-    try:
-        bracket_results = db.reference('data/bracket_results').get() or {}
-    except Exception:
-        bracket_results = {}
-    if isinstance(bracket_results, list):
-        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
-    try:
-        group_winners = db.reference('data/group_winners').get() or {}
-    except Exception:
-        group_winners = {}
-    if isinstance(group_winners, list):
-        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
-
-    scores = _merged_scores()
+    bracket_results, group_winners, scores = _load_bracket_state()
     eliminated = set()
     r32_participants = set()
 
@@ -821,25 +924,13 @@ def _compute_eliminated_teams(now=None):
 def bracket_api():
     """Return the full knockout bracket with placeholders resolved.
 
-    Reads `data/bracket_results/{slot}` from Firebase to substitute resolved
-    team names into placeholder slots like "W R32-01". Admins set these
-    values manually as matches finish.
+    Auto-resolves placeholder slots ("W R32-01") from finished knockout
+    scores in `data/scores`; admin overrides at `data/bracket_results/{slot}`
+    win over the auto-derived value (used for penalty-shootout calls).
     """
-    try:
-        bracket_results = db.reference('data/bracket_results').get() or {}
-    except Exception:
-        bracket_results = {}
-    if isinstance(bracket_results, list):
-        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
-    try:
-        group_winners = db.reference('data/group_winners').get() or {}
-    except Exception:
-        group_winners = {}
-    if isinstance(group_winners, list):
-        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
+    bracket_results, group_winners, scores = _load_bracket_state()
 
     now = datetime.now(timezone.utc)
-    scores = _merged_scores()
     rounds = {'r32': [], 'r16': [], 'qf': [], 'sf': [], '3p': [], 'final': []}
     for fx in ALL_FIXTURES:
         stage = fx.get('stage')
@@ -849,8 +940,14 @@ def bracket_api():
         if not enriched:
             continue
         rounds[stage].append(enriched)
+    # Sort each column in BRACKET order (top-of-tree to bottom), not by
+    # kickoff. This way the visual columns line up: a match in row N of the
+    # R16 column sits next to its two R32 feeders in rows 2N-1 and 2N of
+    # the R32 column. Kickoff times are still displayed on each card.
     for stage in rounds:
-        rounds[stage].sort(key=lambda f: f.get('kickoff_utc') or '')
+        order = _BRACKET_ORDER.get(stage, [])
+        order_index = {slot: i for i, slot in enumerate(order)}
+        rounds[stage].sort(key=lambda f: order_index.get(f.get('bracket_slot'), 999))
 
     eliminated = _compute_eliminated_teams(now)
     return jsonify({
@@ -863,21 +960,8 @@ def bracket_api():
 @app.route('/api/survivors')
 def survivors_api():
     """Per-country alive/eliminated status. Used by the survival tracker."""
-    try:
-        bracket_results = db.reference('data/bracket_results').get() or {}
-    except Exception:
-        bracket_results = {}
-    if isinstance(bracket_results, list):
-        bracket_results = {str(i): v for i, v in enumerate(bracket_results) if v}
-    try:
-        group_winners = db.reference('data/group_winners').get() or {}
-    except Exception:
-        group_winners = {}
-    if isinstance(group_winners, list):
-        group_winners = {str(i): v for i, v in enumerate(group_winners) if v}
-
+    bracket_results, group_winners, scores = _load_bracket_state()
     now = datetime.now(timezone.utc)
-    scores = _merged_scores()
 
     # Trace every knockout result. Each loss eliminates a team; the deepest
     # round they reached is their "exit stage".
