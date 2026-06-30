@@ -367,12 +367,24 @@ def _fetch_live_scores():
                 away_score = int(ev.get('intAwayScore')) if ev.get('intAwayScore') is not None else None
             except (TypeError, ValueError):
                 home_score = away_score = None
-            LIVE_SCORES_AUTO[fid] = {
+            # Knockout shootouts: TheSportsDB exposes the pens tally as
+            # intHomeScoreExtra / intAwayScoreExtra (status flips to "AP" once
+            # a winner is decided). Carry these through so the bracket can
+            # auto-resolve draws.
+            try:
+                home_pens = int(ev.get('intHomeScoreExtra')) if ev.get('intHomeScoreExtra') is not None else None
+                away_pens = int(ev.get('intAwayScoreExtra')) if ev.get('intAwayScoreExtra') is not None else None
+            except (TypeError, ValueError):
+                home_pens = away_pens = None
+            entry = {
                 'home_score': home_score,
                 'away_score': away_score,
                 'status': (ev.get('strStatus') or '').strip(),
                 'minute': (ev.get('strProgress') or '').strip(),
             }
+            if home_pens is not None: entry['home_pens'] = home_pens
+            if away_pens is not None: entry['away_pens'] = away_pens
+            LIVE_SCORES_AUTO[fid] = entry
             updated += 1
 
     LIVE_SCORES_LAST_FETCH = time.time()
@@ -389,9 +401,24 @@ def _live_scores_loop():
         time.sleep(60)
 
 
+_FINISHED_STATUSES = {'ft', 'aet', 'ap', 'match finished'}
+_IN_PROGRESS_STATUSES = {
+    '1h', '2h', 'ht', 'half time', 'half-time', 'live', 'et', 'bt', 'p',
+    'pen', 'penalty', 'penalties',
+}
+
+
 def _merged_scores():
     """Merge TheSportsDB auto-pulled scores with Firebase-stored manual ones.
-    Manual entries always win because they're explicitly authored by us."""
+
+    Manual entries win for the regulation score (that's the whole point of
+    the manual override), with two fallbacks to auto:
+      - `home_pens`/`away_pens` fill in when missing on the manual entry.
+        Older manual rows were written before pens support.
+      - `status` is upgraded from in-progress to finished when auto says the
+        match is done. Otherwise a stale "2H" left over from earlier polling
+        blocks the bracket auto-resolver from advancing the winner.
+    """
     try:
         manual = db.reference('data/scores').get() or {}
         if isinstance(manual, list):
@@ -400,8 +427,19 @@ def _merged_scores():
         manual = {}
     out = dict(LIVE_SCORES_AUTO)
     for fid, val in (manual or {}).items():
-        if isinstance(val, dict):
-            out[fid] = val
+        if not isinstance(val, dict):
+            continue
+        merged = dict(val)
+        auto = LIVE_SCORES_AUTO.get(fid) or {}
+        for pen_field in ('home_pens', 'away_pens'):
+            if merged.get(pen_field) is None and auto.get(pen_field) is not None:
+                merged[pen_field] = auto[pen_field]
+        manual_status = (merged.get('status') or '').strip().lower()
+        auto_status = (auto.get('status') or '').strip().lower()
+        if (manual_status in _IN_PROGRESS_STATUSES
+                and auto_status in _FINISHED_STATUSES):
+            merged['status'] = auto.get('status')
+        out[fid] = merged
     return out
 
 
@@ -1008,7 +1046,17 @@ def survivors_api():
         hs, as_ = sc.get('home_score'), sc.get('away_score')
         if hs is None or as_ is None:
             continue
-        loser = enriched['away'] if hs > as_ else enriched['home'] if as_ > hs else None
+        loser = None
+        if hs > as_:
+            loser = enriched['away']
+        elif as_ > hs:
+            loser = enriched['home']
+        else:
+            # Regulation draw → resolve by pens. Without this branch the
+            # team that lost on penalties stays "alive" on the survivors page.
+            hp, ap = sc.get('home_pens'), sc.get('away_pens')
+            if hp is not None and ap is not None and hp != ap:
+                loser = enriched['away'] if hp > ap else enriched['home']
         if loser and loser not in exit_stage:
             exit_stage[loser] = stage
 
