@@ -32,7 +32,7 @@
         return /^([12][A-L]|Best 3rd|W |L )/i.test(name) || name.length <= 3;
     }
 
-    function renderTeam(name, score, isWinner, isLoser) {
+    function renderTeam(name, score, pens, isWinner, isLoser) {
         const flagSpan = isPlaceholder(name)
             ? '<span class="bk-team-flag tbd">?</span>'
             : `<span class="bk-team-flag">${flag(name)}</span>`;
@@ -43,8 +43,14 @@
         const displayName = isPlaceholder(name)
             ? `<span class="bk-team-name tbd">${esc(name || 'TBD')}</span>`
             : `<span class="bk-team-name">${esc(name)}</span>`;
-        const scoreSpan = (score !== undefined && score !== null)
-            ? `<span class="bk-team-score">${esc(score)}</span>`
+        // "1 (4)" for a shootout win, just "1" otherwise.
+        let scoreText = '';
+        if (score !== undefined && score !== null) {
+            scoreText = String(score);
+            if (pens !== undefined && pens !== null) scoreText += ` (${pens})`;
+        }
+        const scoreSpan = scoreText
+            ? `<span class="bk-team-score">${esc(scoreText)}</span>`
             : '';
         return `<div class="${cls.join(' ')}">${flagSpan}${displayName}${scoreSpan}</div>`;
     }
@@ -53,15 +59,31 @@
         const sc = fx.score || {};
         const hs = sc.home_score;
         const as = sc.away_score;
+        const hp = sc.home_pens;
+        const ap = sc.away_pens;
         const isFt = fx.status === 'ft' && hs != null && as != null;
-        const homeWin = isFt && hs > as;
-        const awayWin = isFt && as > hs;
+        const hasPens = hp != null && ap != null;
+        // Winner is whoever has the higher regulation score; if tied, fall back
+        // to penalty score. Without this, a 2-2 (4-3 pens) game wouldn't
+        // highlight either team as the winner.
+        let homeWin = false, awayWin = false;
+        if (isFt) {
+            if (hs > as) homeWin = true;
+            else if (as > hs) awayWin = true;
+            else if (hasPens) {
+                if (hp > ap) homeWin = true;
+                else if (ap > hp) awayWin = true;
+            }
+        }
 
         let badge = '';
         if (fx.status === 'live') {
             badge = `<span class="bk-badge live"><span class="dot"></span>${esc((sc.minute) || 'LIVE')}</span>`;
         } else if (fx.status === 'ft') {
-            badge = `<span class="bk-badge ft">FT</span>`;
+            // "PENS" beats plain "FT" when the match went to a shootout —
+            // it's the most-asked question after a draw.
+            const label = isFt && hs === as && hasPens ? 'PENS' : 'FT';
+            badge = `<span class="bk-badge ft">${label}</span>`;
         } else if (fx.placeholder) {
             badge = `<span class="bk-badge tbd">TBD</span>`;
         } else {
@@ -81,8 +103,8 @@
             <${clickable ? 'a' : 'div'} class="bk-match ${clickable ? 'clickable' : 'static'} stage-${esc(fx.stage)}"
                ${clickable ? `href="${href}"` : ''}>
                 <div class="bk-match-head">${slot}${badge}</div>
-                ${renderTeam(fx.home, hs, homeWin, awayWin)}
-                ${renderTeam(fx.away, as, awayWin, homeWin)}
+                ${renderTeam(fx.home, hs, hp, homeWin, awayWin)}
+                ${renderTeam(fx.away, as, ap, awayWin, homeWin)}
                 <div class="bk-match-foot">${venue}${clickable ? '<span class="bk-cta">RATE →</span>' : ''}</div>
             </${clickable ? 'a' : 'div'}>`;
     }

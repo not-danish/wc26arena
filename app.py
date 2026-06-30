@@ -841,8 +841,16 @@ def _auto_bracket_results(scores):
                 auto[slot] = {'winner': home, 'loser': away}
             elif as_ > hs:
                 auto[slot] = {'winner': away, 'loser': home}
-            # Draws (penalty wins) need admin to set explicitly — the score
-            # alone doesn't say who advanced.
+            else:
+                # Regulation/ET draw → use the shootout tally to resolve.
+                # If pens aren't recorded yet, the slot stays unresolved and
+                # falls through to manual admin override.
+                hp, ap = sc.get('home_pens'), sc.get('away_pens')
+                if hp is not None and ap is not None and hp != ap:
+                    if hp > ap:
+                        auto[slot] = {'winner': home, 'loser': away}
+                    else:
+                        auto[slot] = {'winner': away, 'loser': home}
     return auto
 
 
@@ -911,6 +919,15 @@ def _compute_eliminated_teams(now=None):
             eliminated.add(enriched.get('away'))
         elif as_ > hs:
             eliminated.add(enriched.get('home'))
+        else:
+            # Regulation draw → check shootout. Without this, a team that
+            # lost on penalties stays marked "alive".
+            hp, ap = sc.get('home_pens'), sc.get('away_pens')
+            if hp is not None and ap is not None and hp != ap:
+                if hp > ap:
+                    eliminated.add(enriched.get('away'))
+                else:
+                    eliminated.add(enriched.get('home'))
 
     if r32_participants:
         for team in COUNTRY_GROUP:
@@ -1042,9 +1059,14 @@ def admin_set_score():
     X-Admin-Secret header. Leave the env var blank to disable the endpoint
     in production.
 
-    Body: {match_id, home_score, away_score, status?, minute?}
+    Body: {match_id, home_score, away_score, status?, minute?,
+           home_pens?, away_pens?}
         status: 'live' | 'ft' | 'upcoming' (defaults: kept from existing)
         minute: any free-text label like "67'" or "HT" (optional)
+        home_pens / away_pens: shootout tally for knockout draws (e.g. 4 / 3).
+            Only include when the match went to penalties. With these set,
+            the bracket auto-resolver picks the right winner from the tied
+            regulation score.
 
     Send {match_id, clear: true} to delete a score entry.
     """
@@ -1067,6 +1089,12 @@ def admin_set_score():
             'status':     (data.get('status') or '').strip(),
             'minute':     (data.get('minute') or '').strip(),
         }
+        # Optional shootout tally. Only stored if present in the request —
+        # we don't want to overwrite a real pens score with 0 on a re-edit.
+        if 'home_pens' in data and data['home_pens'] is not None:
+            entry['home_pens'] = int(data['home_pens'])
+        if 'away_pens' in data and data['away_pens'] is not None:
+            entry['away_pens'] = int(data['away_pens'])
     except (TypeError, ValueError):
         return jsonify({"error": "scores must be integers"}), 400
     ref.set(entry)
